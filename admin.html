@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#05070A">
+<title>成员管理 · 规则网络安全团队</title>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#05070A;
+  --surface:#080C0F;
+  --surface-2:#0C1216;
+  --ink:#F1F5F4;
+  --ink-2:#AFBCBB;
+  --muted:#7C8A8C;
+  --line:#18262C;
+  --line-2:#26383F;
+  --accent:#2FD4A0;
+  --accent-2:#E8B33C;
+  --danger:#E5705F;
+  --radius:6px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:14.5px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    linear-gradient(var(--line) 1px,transparent 1px) 0 0/64px 64px,
+    linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/64px 64px;
+  opacity:.28;
+  mask-image:radial-gradient(150% 150% at 50% 30%,#000 0%,#000 55%,rgba(0,0,0,.6) 100%);
+}
+.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 28px}
+a{color:inherit}
+input,select,button,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 顶栏 */
+.top{
+  position:sticky;top:0;z-index:20;
+  border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(14px);
+}
+.top-in{display:flex;align-items:center;gap:18px;height:64px}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand b{font-size:15px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.brand span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.top-tag{
+  font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);
+  padding:3px 8px;border-radius:3px;white-space:nowrap;
+}
+.grow{flex:1}
+.who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2)}
+.who b{color:var(--ink);font-weight:600}
+
+/* 按钮 */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:36px;padding:0 14px;border-radius:4px;cursor:pointer;
+  border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);
+  font-size:13px;font-weight:500;transition:border-color .16s,background .16s,color .16s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn--primary{background:var(--accent);border-color:var(--accent);color:#04120D;font-weight:600}
+.btn--primary:hover{background:color-mix(in srgb,var(--accent) 86%,#fff);color:#04120D}
+.btn--danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn--sm{height:30px;padding:0 10px;font-size:12px}
+.btn--wide{width:100%;height:42px}
+
+/* 登录闸门 */
+.gate{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:40px 0}
+.card{
+  width:100%;max-width:392px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);padding:28px;
+}
+.card h1{margin:0 0 6px;font-size:20px;font-weight:600;letter-spacing:.01em}
+.card .sub{margin:0 0 24px;font-size:13px;color:var(--muted);line-height:1.7}
+.f{margin-bottom:16px}
+.l{display:block;font-size:12px;color:var(--ink-2);font-weight:500;margin:0 0 7px}
+.i{
+  width:100%;height:42px;padding:0 12px;border-radius:4px;
+  border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);
+  font-size:13.5px;outline:none;transition:border-color .16s,box-shadow .16s;
+}
+.i:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.i::placeholder{color:var(--muted)}
+.err{
+  display:none;margin:0 0 14px;padding:9px 12px;border-radius:4px;font-size:12.5px;
+  color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 34%,transparent);
+  background:color-mix(in srgb,var(--danger) 8%,transparent);
+}
+.err.on{display:block}
+
+/* 主体 */
+.main{padding:32px 0 64px}
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.head h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-.01em}
+.head .meta{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--muted)}
+
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.bar .i{max-width:320px;height:40px}
+.bar .spacer{flex:1}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.row{
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);padding:15px 16px;transition:border-color .2s;
+}
+.row:hover{border-color:var(--line-2)}
+.row-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.av{
+  position:relative;flex:none;width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  font-size:16px;font-weight:600;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);
+}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.idbox{min-width:0;flex:1}
+.nm{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:14.5px;font-weight:600;color:var(--ink);
+}
+.sub2{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  color:var(--muted);margin-top:3px;
+}
+.sub2 .ban{color:var(--danger)}
+.fields{display:grid;grid-template-columns:1.1fr 1fr .6fr;gap:8px}
+.fields label{display:block}
+.fl{
+  display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:4px;
+}
+.fields .i{height:34px;font-size:13px}
+.ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+
+/* 徽章 */
+.badge{
+  position:relative;display:inline-flex;align-items:center;gap:5px;
+  height:20px;padding:0 8px 0 7px;border-radius:3px;
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;
+  border:1px solid transparent;
+}
+.badge i{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+.k-founder{
+  color:#E8B33C;border-color:color-mix(in srgb,#B8860B 62%,transparent);
+  background:linear-gradient(180deg,color-mix(in srgb,#E8B33C 22%,transparent),color-mix(in srgb,#E8B33C 7%,transparent));
+  animation:pulse 2.6s ease-in-out infinite;
+}
+.k-verified{
+  color:#3FC79B;border-color:color-mix(in srgb,#0F7A5C 52%,transparent);
+  background:color-mix(in srgb,#0F7A5C 10%,transparent);
+}
+.k-staff{color:var(--ink-2);border-color:var(--line-2);background:var(--surface-2)}
+.k-elite{color:#6EA8DC;border-color:color-mix(in srgb,#2C5C8A 48%,transparent);background:color-mix(in srgb,#2C5C8A 10%,transparent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.62}}
+
+/* 弹层 */
+.modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
+.modal.on{display:flex}
+.modal-bg{position:absolute;inset:0;background:rgba(3,6,8,.72);backdrop-filter:blur(4px)}
+.sheet{
+  position:relative;width:100%;max-width:520px;max-height:86vh;overflow:auto;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);padding:26px;
+}
+.sheet h2{margin:0 0 6px;font-size:18px;font-weight:600}
+.sheet .cap{margin:0 0 20px;font-size:12.5px;color:var(--muted);line-height:1.7}
+.sheet-x{
+  position:absolute;top:14px;right:14px;width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  border:1px solid var(--line-2);border-radius:4px;background:transparent;color:var(--muted);
+}
+.sheet-x:hover{border-color:var(--accent);color:var(--accent)}
+.sheet-x svg{width:12px;height:12px}
+.brow{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin-bottom:8px;
+}
+.brow-ops{display:flex;gap:6px;flex:none}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+
+/* 空态与骨架 */
+.skel{height:104px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);position:relative;overflow:hidden}
+.skel::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--line-2) 60%,transparent),transparent);
+  animation:shimmer 1.3s linear infinite;
+}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.empty{
+  padding:56px 24px;text-align:center;border:1px dashed var(--line-2);
+  border-radius:var(--radius);color:var(--muted);font-size:13px;line-height:1.8;
+}
+.empty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:6px}
+
+/* 提示条 */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(14px);
+  z-index:80;padding:10px 18px;border-radius:4px;font-size:13px;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink);
+  opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+[hidden]{display:none!important}
+@media (max-width:760px){
+  .wrap{padding:0 18px}
+  .fields{grid-template-columns:1fr}
+  .top-in{height:56px;gap:12px}
+  .brand span,.who span{display:none}
+  .gate{min-height:calc(100vh - 56px)}
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <b>规则网络安全团队</b>
+      <span>Rule Security</span>
+    </div>
+    <span class="top-tag">成员管理</span>
+    <span class="grow"></span>
+    <div class="who" id="who" hidden></div>
+  </div>
+</header>
+
+<!-- 登录闸门 -->
+<section class="gate" id="gate">
+  <div class="card">
+    <h1>管理后台</h1>
+    <p class="sub">仅限具备管理权限的账号。登录后可维护成员档案、认证标志与封禁状态，修改会即时反映到成员名单。</p>
+    <div class="err" id="gateErr"></div>
+    <div class="f">
+      <label class="l" for="uname">登录名</label>
+      <input class="i" id="uname" type="text" autocomplete="username" spellcheck="false" placeholder="xiaohao">
+    </div>
+    <div class="f">
+      <label class="l" for="pass">密码</label>
+      <input class="i" id="pass" type="password" autocomplete="current-password" placeholder="账号密码">
+    </div>
+    <button class="btn btn--primary btn--wide" type="button" id="loginBtn">登录</button>
+  </div>
+</section>
+
+<!-- 主体 -->
+<main class="main" id="main" hidden>
+  <div class="wrap">
+    <div class="head">
+      <h1>成员名单</h1>
+      <span class="meta" id="count">—</span>
+    </div>
+
+    <div class="bar">
+      <input class="i" id="q" type="text" placeholder="搜索姓名、登录名或职务">
+      <span class="spacer"></span>
+      <button class="btn" type="button" id="newBtn">新建成员</button>
+      <button class="btn" type="button" id="refreshBtn">刷新</button>
+      <button class="btn" type="button" id="logoutBtn">退出登录</button>
+    </div>
+
+    <div class="list" id="list"></div>
+  </div>
+</main>
+
+<!-- 弹层 -->
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="modal-bg" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT" tabindex="-1">
+    <button class="sheet-x" type="button" data-close aria-label="关闭">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+    </button>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* 数据服务：与前台同一套 RPC，表对匿名不可见，只能经 SECURITY DEFINER 函数读写 */
+  var API = "https://tmlwftreycbvscquhrap.supabase.co/rest/v1/rpc/";
+  var KEY = "sb_publishable_8pNlC0oS8caEGhxBcImTqQ__p1go_xG";
+  var TK = "rsx.admin.token";
+  var TIMEOUT = 12000;
+
+  var ERR = {
+    SESSION_REQUIRED: "登录状态已失效，请重新登录",
+    ADMIN_ONLY: "当前账号没有管理权限",
+    BAD_CREDENTIALS: "登录名或密码不正确",
+    BANNED: "该账号已被封禁，暂时无法登录",
+    USERNAME_TAKEN: "这个登录名已被占用",
+    CANNOT_DELETE_SELF: "不能删除当前登录的账号",
+    CANNOT_BAN_SELF: "不能封禁当前登录的账号",
+    AVATAR_TOO_LARGE: "头像文件过大，请换一张更小的图片",
+    USERNAME_INVALID: "登录名只允许小写字母、数字与下划线，3–24 位",
+    PASSWORD_SHORT: "初始密码至少 8 位",
+    NAME_INVALID: "显示名称不能为空",
+    NOT_FOUND: "这条记录已不存在，请刷新后重试"
+  };
+
+  var token = null;
+  var me = null;
+  var rows = [];
+  var timer = null;
+
+  function $(sel, root){ return (root || document).querySelector(sel); }
+  function $$(sel, root){ return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function toast(msg){
+    var t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("on");
+    clearTimeout(t._h);
+    t._h = setTimeout(function(){ t.classList.remove("on"); }, 2600);
+  }
+
+  /* rpc：超时 + 网络失败重试一次，错误文案统一转中文 */
+  function once(fn, body){
+    var ctl = new AbortController();
+    var abort = setTimeout(function(){ ctl.abort(); }, TIMEOUT);
+    return fetch(API + fn, {
+      method: "POST",
+      signal: ctl.signal,
+      headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then(function(res){
+      clearTimeout(abort);
+      return res.text().then(function(txt){
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = null; }
+        if (res.ok) return data;
+        var code = (data && (data.message || data.hint || data.code)) || "";
+        var key = Object.keys(ERR).filter(function(k){ return code.indexOf(k) >= 0; })[0];
+        var err = new Error(key ? ERR[key] : (code || "请求失败 " + res.status));
+        err.status = res.status;
+        throw err;
+      });
+    }).catch(function(e){
+      clearTimeout(abort);
+      if (e && e.status) throw e;
+      var net = new Error("网络连不上数据服务，请检查网络后重试");
+      net.network = true;
+      throw net;
+    });
+  }
+
+  function rpc(fn, body){
+    return once(fn, body).catch(function(e){
+      if (!e.network) throw e;
+      return new Promise(function(r){ setTimeout(r, 600); }).then(function(){ return once(fn, body); });
+    });
+  }
+
+  /* ---------- 登录 ---------- */
+  function showGate(msg){
+    $("#gate").hidden = false;
+    $("#main").hidden = true;
+    $("#who").hidden = true;
+    if (msg){
+      var e = $("#gateErr");
+      e.textContent = msg;
+      e.classList.add("on");
+    }
+  }
+
+  function login(){
+    var u = $("#uname").value.trim();
+    var p = $("#pass").value;
+    var e = $("#gateErr");
+    e.classList.remove("on");
+    if (!u || !p){ e.textContent = "请填写登录名与密码"; e.classList.add("on"); return; }
+    var btn = $("#loginBtn");
+    btn.disabled = true;
+    btn.textContent = "正在验证";
+    rpc("rsx_login", { p_uname: u, p_pass: p }).then(function(d){
+      if (!d || !d.me || !d.me.isAdmin) throw new Error(ERR.ADMIN_ONLY);
+      token = d.token;
+      me = d.me;
+      try { localStorage.setItem(TK, token); } catch (err) {}
+      enter();
+    }).catch(function(err){
+      e.textContent = err.message;
+      e.classList.add("on");
+    }).then(function(){
+      btn.disabled = false;
+      btn.textContent = "登录";
+    });
+  }
+
+  function enter(){
+    $("#gate").hidden = true;
+    $("#main").hidden = false;
+    var who = $("#who");
+    who.hidden = false;
+    who.innerHTML = '<span>已登录</span><b>' + esc(me.name) + "</b>";
+    load();
+  }
+
+  function logout(){
+    if (token) rpc("rsx_logout", { p_token: token }).catch(function(){});
+    token = null;
+    me = null;
+    try { localStorage.removeItem(TK); } catch (e) {}
+    rows = [];
+    $("#uname").value = "";
+    $("#pass").value = "";
+    $("#list").innerHTML = "";
+    showGate("");
+  }
+
+  /* ---------- 列表 ---------- */
+  function avHTML(m){
+    var img = m.avatar
+      ? '<img src="' + esc(m.avatar) + '" alt="" loading="lazy" decoding="async" onerror="this.style.display=&#39;none&#39;">'
+      : "";
+    return '<span class="av"><span>' + esc((m.name || "员").charAt(0)) + "</span>" + img + "</span>";
+  }
+
+  function badgeHTML(b){
+    var k = b.kind || "verified";
+    var cls = k === "founder" ? "k-founder" : k === "verified" ? "k-verified" : k === "elite" ? "k-elite" : "k-staff";
+    return '<span class="badge ' + cls + '"><i></i>' + esc(b.label) + "</span>";
+  }
+
+  function rowHTML(m){
+    var badges = (m.badges || []).map(badgeHTML).join(" ");
+    var banned = !!m.bannedUntil;
+    var until = banned ? new Date(m.bannedUntil).toLocaleDateString("zh-CN") : "";
+    var self = !!(me && me.id === m.id);
+    return ''
+      + '<div class="row" data-id="' + esc(m.id) + '">'
+      +   '<div class="row-head">'
+      +     avHTML(m)
+      +     '<div class="idbox">'
+      +       '<div class="nm">' + esc(m.name) + (badges ? " " + badges : "") + "</div>"
+      +       '<div class="sub2">' + (m.since ? esc(m.since) + " 加入 · " : "") + "权重 " + esc(String(m.weight == null ? 100 : m.weight))
+      +         (self ? " · 当前账号" : "")
+      +         (banned ? ' · <span class="ban">封禁至 ' + esc(until) + "</span>" : "")
+      +       "</div>"
+      +     "</div>"
+      +   "</div>"
+      +   '<div class="fields">'
+      +     '<label><span class="fl">职务</span><input class="i" data-k="role" value="' + esc(m.role || "普通成员") + '"></label>'
+      +     '<label><span class="fl">领域</span><input class="i" data-k="field" value="' + esc(m.field || "无") + '"></label>'
+      +     '<label><span class="fl">权重</span><input class="i" data-k="weight" type="number" min="1" max="999" value="' + esc(String(m.weight == null ? 100 : m.weight)) + '"></label>'
+      +   "</div>"
+      +   '<div class="ops">'
+      +     '<button class="btn btn--sm" type="button" data-op="save">保存</button>'
+      +     '<button class="btn btn--sm" type="button" data-op="badge">认证标志</button>'
+      +     '<button class="btn btn--sm" type="button" data-op="ban">' + (banned ? "解封 / 改期" : "封禁") + "</button>"
+      +     (self ? "" : '<button class="btn btn--sm btn--danger" type="button" data-op="del">删除</button>')
+      +   "</div>"
+      + "</div>";
+  }
+
+  function load(){
+    var list = $("#list");
+    list.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    rpc("rsx_admin_members", { p_token: token, p_q: $("#q").value.trim() }).then(function(data){
+      rows = data || [];
+      $("#count").textContent = (rows.length < 10 ? "0" : "") + rows.length + " MEMBERS";
+      if (!rows.length){
+        list.innerHTML = '<div class="empty"><b>没有匹配的成员</b>换个关键词，或清空搜索框查看全部。</div>';
+        return;
+      }
+      list.innerHTML = rows.map(rowHTML).join("");
+    }).catch(function(e){
+      if (e.status === 403 || e.status === 401){ showGate(e.message); return; }
+      list.innerHTML = '<div class="empty"><b>名单加载不出来</b>' + esc(e.message) + "</div>";
+    });
+  }
+
+  /* ---------- 行内操作 ---------- */
+  function rowOps(e){
+    var btn = e.target.closest("button[data-op]");
+    if (!btn) return;
+    var row = btn.closest(".row");
+    var id = row.getAttribute("data-id");
+    var op = btn.getAttribute("data-op");
+
+    if (op === "save"){
+      var role = $('[data-k="role"]', row).value.trim() || "普通成员";
+      var field = $('[data-k="field"]', row).value.trim() || "无";
+      var w = Number($('[data-k="weight"]', row).value);
+      if (!(w >= 1 && w <= 999)) w = 100;
+      btn.disabled = true;
+      rpc("rsx_admin_save", { p_token: token, p: { id: id, role: role, field: field, weight: w } })
+        .then(function(){ toast("已保存，" + role + " · " + field); load(); })
+        .catch(function(err){ toast(err.message); })
+        .then(function(){ btn.disabled = false; });
+      return;
+    }
+    if (op === "badge"){ sheetBadge(id); return; }
+    if (op === "ban"){ sheetBan(id); return; }
+    if (op === "del"){
+      if (!confirm("删除后该成员的徽章与登录会话会一并清除，且不可恢复。确认删除？")) return;
+      btn.disabled = true;
+      rpc("rsx_admin_delete", { p_token: token, p_id: id })
+        .then(function(){ toast("已删除"); load(); })
+        .catch(function(err){ toast(err.message); btn.disabled = false; });
+    }
+  }
+
+  /* ---------- 弹层基础设施 ---------- */
+  var modalHost = $("#modal");
+  var escBound = false;
+
+  function openSheet(html){
+    $("#sheetBody").innerHTML = html;
+    modalHost.classList.add("on");
+    modalHost.setAttribute("aria-hidden", "false");
+    var card = $(".sheet", modalHost);
+    card.setAttribute("tabindex", "-1");
+    card.focus();
+    if (!escBound){
+      escBound = true;
+      document.addEventListener("keydown", function(e){
+        if (e.key === "Escape" && modalHost.classList.contains("on")){
+          e.preventDefault();
+          closeSheet();
+        }
+      });
+    }
+  }
+
+  function closeSheet(){
+    modalHost.classList.remove("on");
+    modalHost.setAttribute("aria-hidden", "true");
+    $("#sheetBody").innerHTML = "";
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  modalHost.addEventListener("click", function(e){
+    if (e.target.hasAttribute("data-close")) closeSheet();
+  });
+
+  /* ---------- 认证标志 ---------- */
+  function sheetBadge(id){
+    var m = rows.filter(function(x){ return x.id === id; })[0] || {};
+    var kinds = [
+      ["founder", "官方认证 · 创始人"],
+      ["verified", "官方认证"],
+      ["staff", "核心成员"],
+      ["elite", "技术专家"]
+    ];
+    openSheet(
+      '<h2 id="sheetT">认证标志</h2>'
+      + '<p class="cap">' + esc(m.name || "") + " · 标志按顺序排列在成员名单与个人主页，带渐变与呼吸效果。</p>"
+      + kinds.map(function(k){
+          var cls = k[0] === "founder" ? "k-founder" : k[0] === "verified" ? "k-verified" : k[0] === "elite" ? "k-elite" : "k-staff";
+          return '<div class="brow"><span class="badge ' + cls + '"><i></i>' + k[1] + "</span>"
+            + '<span class="brow-ops">'
+            + '<button class="btn btn--sm" type="button" data-k="' + k[0] + '" data-a="grant">发放</button>'
+            + '<button class="btn btn--sm" type="button" data-k="' + k[0] + '" data-a="revoke">撤销</button>'
+            + "</span></div>";
+        }).join("")
+    );
+    $$(".brow button[data-k]", modalHost).forEach(function(b){
+      b.addEventListener("click", function(){
+        b.disabled = true;
+        rpc("rsx_admin_badge", {
+          p_token: token, p_id: id,
+          p_kind: b.getAttribute("data-k"), p_action: b.getAttribute("data-a")
+        }).then(function(){ toast("已更新"); closeSheet(); load(); })
+          .catch(function(err){ toast(err.message); b.disabled = false; });
+      });
+    });
+  }
+
+  /* ---------- 封禁 ---------- */
+  function sheetBan(id){
+    var m = rows.filter(function(x){ return x.id === id; })[0] || {};
+    var opts = [["1", "1 小时"], ["24", "1 天"], ["72", "3 天"], ["168", "7 天"], ["720", "30 天"], ["0", "解除封禁"]];
+    openSheet(
+      '<h2 id="sheetT">封禁设置</h2>'
+      + '<p class="cap">' + esc(m.name || "") + " · 封禁立即生效，该成员的全部登录会话同时失效，主页会显示封禁提示。</p>"
+      + '<div class="f"><label class="l" for="bh">时长</label><select class="i" id="bh">'
+      + opts.map(function(o){ return '<option value="' + o[0] + '">' + o[1] + "</option>"; }).join("")
+      + "</select></div>"
+      + '<div class="f"><label class="l" for="br">说明</label>'
+      + '<input class="i" id="br" type="text" maxlength="80" placeholder="可选，会显示在被封禁成员的主页"></div>'
+      + '<div class="actions"><button class="btn" type="button" data-close>取消</button>'
+      + '<button class="btn btn--primary" type="button" id="bok">执行</button></div>'
+    );
+    $("#bok").addEventListener("click", function(){
+      var b = $("#bok");
+      b.disabled = true;
+      rpc("rsx_admin_ban", {
+        p_token: token, p_id: id,
+        p_hours: Number($("#bh").value),
+        p_reason: $("#br").value.trim()
+      }).then(function(){ toast("封禁状态已更新"); closeSheet(); load(); })
+        .catch(function(err){ toast(err.message); b.disabled = false; });
+    });
+  }
+
+  /* ---------- 新建成员 ---------- */
+  function sheetNew(){
+    openSheet(
+      '<h2 id="sheetT">新建成员</h2>'
+      + '<p class="cap">用于录入没有走自助申请流程的成员。创建后即可用该账号登录个人主页。</p>'
+      + '<div class="f"><label class="l" for="nu">登录名</label><input class="i" id="nu" type="text" placeholder="小写字母、数字、下划线，3–24 位"></div>'
+      + '<div class="f"><label class="l" for="np">初始密码</label><input class="i" id="np" type="password" placeholder="至少 8 位"></div>'
+      + '<div class="f"><label class="l" for="nn">显示名称</label><input class="i" id="nn" type="text" maxlength="16" placeholder="2–16 个字"></div>'
+      + '<div class="f"><label class="l" for="nr">职务</label><input class="i" id="nr" type="text" value="普通成员"></div>'
+      + '<div class="f"><label class="l" for="nf">领域</label><input class="i" id="nf" type="text" value="无"></div>'
+      + '<div class="err" id="nerr"></div>'
+      + '<div class="actions"><button class="btn" type="button" data-close>取消</button>'
+      + '<button class="btn btn--primary" type="button" id="nok">创建</button></div>'
+    );
+    $("#nok").addEventListener("click", function(){
+      var e = $("#nerr");
+      e.classList.remove("on");
+      var body = {
+        uname: $("#nu").value.trim(),
+        pass: $("#np").value,
+        name: $("#nn").value.trim(),
+        role: $("#nr").value.trim() || "普通成员",
+        field: $("#nf").value.trim() || "无"
+      };
+      if (body.uname.length < 3){ e.textContent = "登录名至少 3 位"; e.classList.add("on"); return; }
+      if (body.pass.length < 8){ e.textContent = "密码至少 8 位"; e.classList.add("on"); return; }
+      if (body.name.length < 2){ e.textContent = "显示名称至少 2 个字"; e.classList.add("on"); return; }
+      var b = $("#nok");
+      b.disabled = true;
+      rpc("rsx_admin_save", { p_token: token, p: body }).then(function(){
+        toast("已创建 " + body.name);
+        closeSheet();
+        load();
+      }).catch(function(err){
+        e.textContent = err.message;
+        e.classList.add("on");
+        b.disabled = false;
+      });
+    });
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  $("#loginBtn").addEventListener("click", login);
+  $("#pass").addEventListener("keydown", function(e){ if (e.key === "Enter") login(); });
+  $("#uname").addEventListener("keydown", function(e){ if (e.key === "Enter") $("#pass").focus(); });
+  $("#newBtn").addEventListener("click", sheetNew);
+  $("#refreshBtn").addEventListener("click", load);
+  $("#logoutBtn").addEventListener("click", logout);
+  $("#list").addEventListener("click", rowOps);
+  $("#q").addEventListener("input", function(){
+    clearTimeout(timer);
+    timer = setTimeout(load, 280);
+  });
+
+  /* ---------- 启动：有 token 先验一次身份 ---------- */
+  (function boot(){
+    try { token = localStorage.getItem(TK); } catch (e) { token = null; }
+    if (!token){ showGate(""); return; }
+    rpc("rsx_whoami", { p_token: token }).then(function(d){
+      if (!d || !d.isAdmin){ throw new Error(ERR.ADMIN_ONLY); }
+      me = d;
+      enter();
+    }).catch(function(e){
+      token = null;
+      me = null;
+      try { localStorage.removeItem(TK); } catch (err) {}
+      showGate(e.message);
+    });
+  })();
+})();
+</script>
+</body>
+</html>
