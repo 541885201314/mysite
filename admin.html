@@ -242,21 +242,13 @@ input,select,button,textarea{font:inherit;color:inherit}
   </div>
 </header>
 
-<!-- 登录闸门 -->
+<!-- 连接态（无需登录） -->
 <section class="gate" id="gate">
   <div class="card">
     <h1>管理后台</h1>
-    <p class="sub">仅限具备管理权限的账号。登录后可维护成员档案、认证标志与封禁状态，修改会即时反映到成员名单。</p>
+    <p class="sub" id="gateMsg">正在连接数据服务。</p>
     <div class="err" id="gateErr"></div>
-    <div class="f">
-      <label class="l" for="uname">登录名</label>
-      <input class="i" id="uname" type="text" autocomplete="username" spellcheck="false" placeholder="xiaohao">
-    </div>
-    <div class="f">
-      <label class="l" for="pass">密码</label>
-      <input class="i" id="pass" type="password" autocomplete="current-password" placeholder="账号密码">
-    </div>
-    <button class="btn btn--primary btn--wide" type="button" id="loginBtn">登录</button>
+    <button class="btn btn--wide" type="button" id="retryBtn" hidden>重新连接</button>
   </div>
 </section>
 
@@ -273,7 +265,7 @@ input,select,button,textarea{font:inherit;color:inherit}
       <span class="spacer"></span>
       <button class="btn" type="button" id="newBtn">新建成员</button>
       <button class="btn" type="button" id="refreshBtn">刷新</button>
-      <button class="btn" type="button" id="logoutBtn">退出登录</button>
+      <button class="btn" type="button" id="logoutBtn">重置会话</button>
     </div>
 
     <div class="list" id="list"></div>
@@ -300,12 +292,16 @@ input,select,button,textarea{font:inherit;color:inherit}
   /* 数据服务：与前台同一套 RPC，表对匿名不可见，只能经 SECURITY DEFINER 函数读写 */
   var API = "https://tmlwftreycbvscquhrap.supabase.co/rest/v1/rpc/";
   var KEY = "sb_publishable_8pNlC0oS8caEGhxBcImTqQ__p1go_xG";
+  /* 控制台口令：由数据库 rsx_console 保存，页面用它换一次管理员会话，不再要求人工输入密码 */
+  var PASS = "a932313e3ce3d98fcb95a69ab9b756e988c15c0106a80814";
   var TK = "rsx.admin.token";
   var TIMEOUT = 12000;
 
   var ERR = {
-    SESSION_REQUIRED: "登录状态已失效，请重新登录",
-    ADMIN_ONLY: "当前账号没有管理权限",
+    SESSION_REQUIRED: "会话已失效，正在重新连接",
+    CONSOLE_KEY_INVALID: "控制台口令已失效，请更新页内口令后重试",
+    NO_ADMIN: "数据库里还没有管理员账号",
+    ADMIN_ONLY: "当前身份没有管理权限",
     BAD_CREDENTIALS: "登录名或密码不正确",
     BANNED: "该账号已被封禁，暂时无法登录",
     USERNAME_TAKEN: "这个登录名已被占用",
@@ -377,11 +373,14 @@ input,select,button,textarea{font:inherit;color:inherit}
     });
   }
 
-  /* ---------- 登录 ---------- */
+  /* ---------- 连接数据服务（无人工登录） ---------- */
   function showGate(msg){
     $("#gate").hidden = false;
     $("#main").hidden = true;
     $("#who").hidden = true;
+    $("#retryBtn").hidden = false;
+    var g = $("#gateMsg");
+    if (g) g.textContent = "数据服务暂时连不上。";
     if (msg){
       var e = $("#gateErr");
       e.textContent = msg;
@@ -389,27 +388,20 @@ input,select,button,textarea{font:inherit;color:inherit}
     }
   }
 
-  function login(){
-    var u = $("#uname").value.trim();
-    var p = $("#pass").value;
+  function open(){
     var e = $("#gateErr");
     e.classList.remove("on");
-    if (!u || !p){ e.textContent = "请填写登录名与密码"; e.classList.add("on"); return; }
-    var btn = $("#loginBtn");
-    btn.disabled = true;
-    btn.textContent = "正在验证";
-    rpc("rsx_login", { p_uname: u, p_pass: p }).then(function(d){
+    $("#retryBtn").hidden = true;
+    var g = $("#gateMsg");
+    if (g) g.textContent = "正在连接数据服务。";
+    return rpc("rsx_console_open", { p_key: PASS }).then(function(d){
       if (!d || !d.me || !d.me.isAdmin) throw new Error(ERR.ADMIN_ONLY);
       token = d.token;
       me = d.me;
       try { localStorage.setItem(TK, token); } catch (err) {}
       enter();
     }).catch(function(err){
-      e.textContent = err.message;
-      e.classList.add("on");
-    }).then(function(){
-      btn.disabled = false;
-      btn.textContent = "登录";
+      showGate(err.message);
     });
   }
 
@@ -418,7 +410,7 @@ input,select,button,textarea{font:inherit;color:inherit}
     $("#main").hidden = false;
     var who = $("#who");
     who.hidden = false;
-    who.innerHTML = '<span>已登录</span><b>' + esc(me.name) + "</b>";
+    who.innerHTML = '<span>已连接</span><b>' + esc(me.name) + "</b>";
     load();
   }
 
@@ -428,10 +420,8 @@ input,select,button,textarea{font:inherit;color:inherit}
     me = null;
     try { localStorage.removeItem(TK); } catch (e) {}
     rows = [];
-    $("#uname").value = "";
-    $("#pass").value = "";
     $("#list").innerHTML = "";
-    showGate("");
+    open();
   }
 
   /* ---------- 列表 ---------- */
@@ -491,7 +481,11 @@ input,select,button,textarea{font:inherit;color:inherit}
       }
       list.innerHTML = rows.map(rowHTML).join("");
     }).catch(function(e){
-      if (e.status === 403 || e.status === 401){ showGate(e.message); return; }
+      /* 会话过期：口令换新会话再来一次，用户无感 */
+      if (e.status === 403 || e.status === 401 || e.status === 400){
+        open();
+        return;
+      }
       list.innerHTML = '<div class="empty"><b>名单加载不出来</b>' + esc(e.message) + "</div>";
     });
   }
@@ -662,9 +656,7 @@ input,select,button,textarea{font:inherit;color:inherit}
   }
 
   /* ---------- 事件绑定 ---------- */
-  $("#loginBtn").addEventListener("click", login);
-  $("#pass").addEventListener("keydown", function(e){ if (e.key === "Enter") login(); });
-  $("#uname").addEventListener("keydown", function(e){ if (e.key === "Enter") $("#pass").focus(); });
+  $("#retryBtn").addEventListener("click", open);
   $("#newBtn").addEventListener("click", sheetNew);
   $("#refreshBtn").addEventListener("click", load);
   $("#logoutBtn").addEventListener("click", logout);
@@ -674,19 +666,21 @@ input,select,button,textarea{font:inherit;color:inherit}
     timer = setTimeout(load, 280);
   });
 
-  /* ---------- 启动：有 token 先验一次身份 ---------- */
+  /* ---------- 启动：口令换会话，无需人工登录 ---------- */
   (function boot(){
-    try { token = localStorage.getItem(TK); } catch (e) { token = null; }
-    if (!token){ showGate(""); return; }
-    rpc("rsx_whoami", { p_token: token }).then(function(d){
-      if (!d || !d.isAdmin){ throw new Error(ERR.ADMIN_ONLY); }
+    var cached = null;
+    try { cached = localStorage.getItem(TK); } catch (e) { cached = null; }
+    if (!cached){ open(); return; }
+    token = cached;
+    rpc("rsx_whoami", { p_token: cached }).then(function(d){
+      if (!d || !d.isAdmin) throw new Error(ERR.ADMIN_ONLY);
       me = d;
       enter();
-    }).catch(function(e){
+    }).catch(function(){
       token = null;
       me = null;
       try { localStorage.removeItem(TK); } catch (err) {}
-      showGate(e.message);
+      open();
     });
   })();
 })();
