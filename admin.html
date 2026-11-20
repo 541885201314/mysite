@@ -138,13 +138,45 @@ input,select,button,textarea{font:inherit;color:inherit}
 }
 .sub2 .ban{color:var(--danger)}
 .fields{display:grid;grid-template-columns:1.1fr 1fr .6fr;gap:8px}
-.fields label{display:block}
+.fields.two{grid-template-columns:1fr 1fr}
+.fields label{display:block;min-width:0}
 .fl{
-  display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--muted);margin-bottom:4px;
+  display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px;
 }
 .fields .i{height:34px;font-size:13px}
-.ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.fields select.i{font-family:var(--mono);font-size:12px;letter-spacing:.02em;cursor:pointer}
+.blk{display:block;margin-top:9px}
+.blk .i{height:34px;font-size:13px}
+.i.ta{height:auto;min-height:66px;padding:7px 10px;line-height:1.6;resize:vertical}
+.row.is-lead{border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+.more{margin-top:11px;border-top:1px solid var(--line);padding-top:10px}
+.more > summary{
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;
+  min-height:24px;transition:color .16s;
+}
+.more > summary::-webkit-details-marker{display:none}
+.more > summary::before{
+  content:"";width:5px;height:5px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;
+  transform:rotate(45deg);margin-top:-2px;transition:transform .2s;
+}
+.more[open] > summary::before{transform:rotate(225deg);margin-top:1px}
+.more > summary:hover,.more[open] > summary{color:var(--ink-2)}
+.more > summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+.more > summary + *{margin-top:9px}
+.ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.ops .btn{min-height:30px}
+
+/* 排序与统计 */
+.bar-sel{height:40px;padding:0 10px;border-radius:4px;border:1px solid var(--line-2);
+  background:var(--surface-2);color:var(--ink);font-family:var(--mono);font-size:12px;cursor:pointer}
+.stats{
+  display:flex;flex-wrap:wrap;gap:0 26px;margin:-4px 0 16px;padding:11px 14px;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+}
+.stats span{display:inline-flex;align-items:baseline;gap:6px;font-size:11.5px;letter-spacing:.06em;color:var(--muted)}
+.stats b{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:0;color:var(--ink)}
 
 /* 徽章 */
 .badge{
@@ -219,9 +251,26 @@ input,select,button,textarea{font:inherit;color:inherit}
 @media (max-width:760px){
   .wrap{padding:0 18px}
   .fields{grid-template-columns:1fr}
+  .fields.two{grid-template-columns:1fr}
   .top-in{height:56px;gap:12px}
   .brand span,.who span{display:none}
   .gate{min-height:calc(100vh - 56px)}
+  /* 手机端工具条改为两行：搜索占满整行，按钮均分，避免「重置会话」单独落单 */
+  .bar{gap:8px}
+  .bar .i{max-width:none;flex:1 1 100%;order:1}
+  .bar .bar-sel{order:2;flex:1 1 auto}
+  .bar .spacer{display:none}
+  .bar .btn{order:3;flex:1 1 30%;min-width:0;padding:0 8px;font-size:12.5px}
+  .stats{gap:0 16px;padding:10px 12px;margin-bottom:14px}
+  .stats span{font-size:11px}
+  .row{padding:16px}
+  .row-head{gap:10px}
+  .ops .btn{flex:1 1 44%;min-width:0}
+  .list{gap:12px}
+}
+@media (max-width:420px){
+  .bar .btn{flex:1 1 46%}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
 }
 @media (prefers-reduced-motion: reduce){
   *{animation:none!important;transition:none!important}
@@ -261,12 +310,19 @@ input,select,button,textarea{font:inherit;color:inherit}
     </div>
 
     <div class="bar">
-      <input class="i" id="q" type="text" placeholder="搜索姓名、登录名或职务">
+      <input class="i" id="q" type="text" placeholder="搜索姓名、登录名、职务、领域或 TT 号">
+      <select class="bar-sel" id="sort">
+        <option value="weight">按排序</option>
+        <option value="recent">按注册时间</option>
+        <option value="name">按名称</option>
+      </select>
       <span class="spacer"></span>
       <button class="btn" type="button" id="newBtn">新建成员</button>
       <button class="btn" type="button" id="refreshBtn">刷新</button>
       <button class="btn" type="button" id="logoutBtn">重置会话</button>
     </div>
+
+    <div class="stats" id="stats"></div>
 
     <div class="list" id="list"></div>
   </div>
@@ -317,7 +373,36 @@ input,select,button,textarea{font:inherit;color:inherit}
   var token = null;
   var me = null;
   var rows = [];
-  var timer = null;
+
+  /* 职务与领域走固定词表，避免同一职务出现多种写法导致排序与筛选失效；
+     词表之外的历史值会被 pickHTML 原样保留，不会被静默改写 */
+  var ROLE_OPTS = ["创始人 · 团队统筹", "系统方向负责人", "防御方向负责人", "情报方向负责人",
+                   "内容方向负责人", "研究组组长", "核心成员", "技术专家", "普通成员"];
+  var FIELD_OPTS = ["无", "团队统筹", "系统与权限", "防御加固", "协议分析", "监控运营",
+                    "威胁情报", "应急响应", "漏洞研究", "Web 安全", "逆向基础"];
+  var WEIGHT_OPTS = [[10, "置顶"], [30, "靠前"], [100, "标准"], [300, "靠后"], [900, "末位"]];
+
+  function pickHTML(list, cur){
+    var v = cur == null ? "" : String(cur);
+    var arr = (list.indexOf(v) >= 0 || !v) ? list : [v].concat(list);
+    return arr.map(function(x){
+      return '<option value="' + esc(x) + '"' + (x === v ? " selected" : "") + ">" + esc(x) + "</option>";
+    }).join("");
+  }
+
+  function weightHTML(cur){
+    var w = Number(cur) || 100;
+    var known = WEIGHT_OPTS.some(function(o){ return o[0] === w; });
+    var arr = known ? WEIGHT_OPTS : [[w, "当前 " + w]].concat(WEIGHT_OPTS);
+    return arr.map(function(o){
+      return '<option value="' + o[0] + '"' + (o[0] === w ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("");
+  }
+
+  function listSplit(s){
+    return String(s || "").split(/[,，\n]/).map(function(x){ return x.trim(); })
+      .filter(function(x){ return x; }).slice(0, 6);
+  }
 
   function $(sel, root){ return (root || document).querySelector(sel); }
   function $$(sel, root){ return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -410,7 +495,10 @@ input,select,button,textarea{font:inherit;color:inherit}
     $("#main").hidden = false;
     var who = $("#who");
     who.hidden = false;
-    who.innerHTML = '<span>已连接</span><b>' + esc(me.name) + "</b>";
+    /* 这里显示的是「会话类型」而不是某个人的登录态：控制台口令换来的管理员会话
+       可以管理全部成员，写成「已连接 小浩」会让人误以为自己在用小浩的账号 */
+    who.title = "管理员会话，授权来源：" + (me && me.name ? me.name : "管理员");
+    who.innerHTML = '<span>管理员会话</span><b>全部成员可管理</b>';
     load();
   }
 
@@ -443,37 +531,68 @@ input,select,button,textarea{font:inherit;color:inherit}
     var banned = !!m.bannedUntil;
     var until = banned ? new Date(m.bannedUntil).toLocaleDateString("zh-CN") : "";
     var self = !!(me && me.id === m.id);
+    var lead = !!(m.badges && m.badges.length) || (m.role && !/^(普通成员|成员|新成员|待分配|普通人员)$/.test(m.role.trim()));
+    var wtxt = (WEIGHT_OPTS.filter(function(o){ return o[0] === (Number(m.weight) || 100); })[0] || [0, "当前 " + (m.weight || 100)])[1];
     return ''
-      + '<div class="row" data-id="' + esc(m.id) + '">'
+      + '<div class="row' + (lead ? " is-lead" : "") + '" data-id="' + esc(m.id) + '">'
       +   '<div class="row-head">'
       +     avHTML(m)
       +     '<div class="idbox">'
       +       '<div class="nm">' + esc(m.name) + (badges ? " " + badges : "") + "</div>"
-      +       '<div class="sub2">' + (m.since ? esc(m.since) + " 加入 · " : "") + "权重 " + esc(String(m.weight == null ? 100 : m.weight))
+      +       '<div class="sub2">' + esc(m.role || "普通成员") + " · " + esc(m.field || "无")
+      +         " · 排序 " + esc(wtxt)
+      +         " · " + (m.focus || []).length + " 关注 · " + (m.projects || []).length + " 在研"
+      +         (m.since ? " · " + esc(m.since) + " 加入" : "")
       +         (self ? " · 当前账号" : "")
       +         (banned ? ' · <span class="ban">封禁至 ' + esc(until) + "</span>" : "")
       +       "</div>"
       +     "</div>"
       +   "</div>"
       +   '<div class="fields">'
-      +     '<label><span class="fl">职务</span><input class="i" data-k="role" value="' + esc(m.role || "普通成员") + '"></label>'
-      +     '<label><span class="fl">领域</span><input class="i" data-k="field" value="' + esc(m.field || "无") + '"></label>'
-      +     '<label><span class="fl">权重</span><input class="i" data-k="weight" type="number" min="1" max="999" value="' + esc(String(m.weight == null ? 100 : m.weight)) + '"></label>'
+      +     '<label><span class="fl">职务</span><select class="i" data-k="role">' + pickHTML(ROLE_OPTS, m.role) + "</select></label>"
+      +     '<label><span class="fl">领域</span><select class="i" data-k="field">' + pickHTML(FIELD_OPTS, m.field || "无") + "</select></label>"
+      +     '<label><span class="fl">排序</span><select class="i" data-k="weight">' + weightHTML(m.weight) + "</select></label>"
       +   "</div>"
+      +   '<details class="more"><summary>关注方向 / 在研项目 / 意向方向 / 职责</summary>'
+      +     '<div class="fields two">'
+      +       '<label><span class="fl">意向方向</span><input class="i" data-k="dir" type="text" maxlength="40" value="' + esc(m.appliedDir || "") + '"></label>'
+      +       '<label><span class="fl">职责</span><input class="i" data-k="duty" type="text" maxlength="120" value="' + esc((m.contact && m.contact.duty) || "") + '"></label>'
+      +     "</div>"
+      +     '<label class="blk"><span class="fl">关注方向（逗号分隔，最多 6 项）</span>'
+      +       '<input class="i" data-k="focus" type="text" maxlength="90" value="' + esc((m.focus || []).join("，")) + '"></label>'
+      +     '<label class="blk"><span class="fl">在研项目（每行一项，最多 6 项）</span>'
+      +       '<textarea class="i ta" data-k="projects" rows="3" maxlength="300">' + esc((m.projects || []).join("\n")) + "</textarea></label>"
+      +   "</details>"
       +   '<div class="ops">'
-      +     '<button class="btn btn--sm" type="button" data-op="save">保存</button>'
+      +     '<button class="btn btn--sm btn--primary" type="button" data-op="save">保存改动</button>'
       +     '<button class="btn btn--sm" type="button" data-op="badge">认证标志</button>'
       +     '<button class="btn btn--sm" type="button" data-op="ban">' + (banned ? "解封 / 改期" : "封禁") + "</button>"
+      +     '<button class="btn btn--sm" type="button" data-op="pass">重置密码</button>'
       +     (self ? "" : '<button class="btn btn--sm btn--danger" type="button" data-op="del">删除</button>')
       +   "</div>"
       + "</div>";
   }
 
+  function loadStats(){
+    rpc("rsx_admin_stats", { p_token: token }).then(function(s){
+      var el = $("#stats");
+      if (!el || !s) return;
+      el.innerHTML = "<span><b>" + esc(String(s.members)) + "</b>成员</span>"
+        + "<span><b>" + esc(String(s.badges)) + "</b>认证标志</span>"
+        + "<span><b>" + esc(String(s.banned)) + "</b>封禁中</span>"
+        + "<span><b>" + esc(String(s.online)) + "</b>在线会话</span>";
+    }).catch(function(){});
+  }
+
   function load(){
     var list = $("#list");
     list.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
-    rpc("rsx_admin_members", { p_token: token, p_q: $("#q").value.trim() }).then(function(data){
-      rows = data || [];
+    rpc("rsx_admin_members", {
+      p_token: token,
+      p_q: $("#q").value.trim(),
+      p_sort: $("#sort").value
+    }).then(function(data){
+      rows = (data && data.rows) || [];
       $("#count").textContent = (rows.length < 10 ? "0" : "") + rows.length + " MEMBERS";
       if (!rows.length){
         list.innerHTML = '<div class="empty"><b>没有匹配的成员</b>换个关键词，或清空搜索框查看全部。</div>';
@@ -488,6 +607,7 @@ input,select,button,textarea{font:inherit;color:inherit}
       }
       list.innerHTML = '<div class="empty"><b>名单加载不出来</b>' + esc(e.message) + "</div>";
     });
+    loadStats();
   }
 
   /* ---------- 行内操作 ---------- */
@@ -499,19 +619,26 @@ input,select,button,textarea{font:inherit;color:inherit}
     var op = btn.getAttribute("data-op");
 
     if (op === "save"){
-      var role = $('[data-k="role"]', row).value.trim() || "普通成员";
-      var field = $('[data-k="field"]', row).value.trim() || "无";
-      var w = Number($('[data-k="weight"]', row).value);
-      if (!(w >= 1 && w <= 999)) w = 100;
+      var p = {
+        id: id,
+        role: $('[data-k="role"]', row).value,
+        field: $('[data-k="field"]', row).value,
+        weight: Number($('[data-k="weight"]', row).value),
+        dir: $('[data-k="dir"]', row).value.trim(),
+        duty: $('[data-k="duty"]', row).value.trim(),
+        focus: listSplit($('[data-k="focus"]', row).value),
+        projects: listSplit($('[data-k="projects"]', row).value)
+      };
       btn.disabled = true;
-      rpc("rsx_admin_save", { p_token: token, p: { id: id, role: role, field: field, weight: w } })
-        .then(function(){ toast("已保存，" + role + " · " + field); load(); })
+      rpc("rsx_admin_card", { p_token: token, p_id: id, p: p })
+        .then(function(){ toast("已保存，" + p.role + " · " + p.field); load(); })
         .catch(function(err){ toast(err.message); })
         .then(function(){ btn.disabled = false; });
       return;
     }
     if (op === "badge"){ sheetBadge(id); return; }
     if (op === "ban"){ sheetBan(id); return; }
+    if (op === "pass"){ sheetPass(id); return; }
     if (op === "del"){
       if (!confirm("删除后该成员的徽章与登录会话会一并清除，且不可恢复。确认删除？")) return;
       btn.disabled = true;
@@ -614,16 +741,40 @@ input,select,button,textarea{font:inherit;color:inherit}
     });
   }
 
+  /* ---------- 重置密码 ---------- */
+  function sheetPass(id){
+    var m = rows.filter(function(x){ return x.id === id; })[0] || {};
+    openSheet(
+      '<h2 id="sheetT">重置登录密码</h2>'
+      + '<p class="cap">' + esc(m.name || "") + " · 保存后该成员现有登录会全部失效，需要用新密码重新登录。</p>"
+      + '<div class="f"><label class="l" for="pw">新密码</label>'
+      + '<input class="i" id="pw" type="password" autocomplete="new-password" placeholder="至少 8 位"></div>'
+      + '<div class="err" id="perr"></div>'
+      + '<div class="actions"><button class="btn" type="button" data-close>取消</button>'
+      + '<button class="btn btn--primary" type="button" id="pok">重置</button></div>'
+    );
+    $("#pok").addEventListener("click", function(){
+      var e = $("#perr"); e.classList.remove("on");
+      var v = $("#pw").value;
+      if (v.length < 8){ e.textContent = "密码至少 8 位"; e.classList.add("on"); return; }
+      var b = $("#pok");
+      b.disabled = true;
+      rpc("rsx_admin_reset_pass", { p_token: token, p_id: id, p_pass: v })
+        .then(function(){ toast("密码已重置"); closeSheet(); load(); })
+        .catch(function(err){ e.textContent = err.message; e.classList.add("on"); b.disabled = false; });
+    });
+  }
+
   /* ---------- 新建成员 ---------- */
   function sheetNew(){
     openSheet(
       '<h2 id="sheetT">新建成员</h2>'
       + '<p class="cap">用于录入没有走自助申请流程的成员。创建后即可用该账号登录个人主页。</p>'
-      + '<div class="f"><label class="l" for="nu">登录名</label><input class="i" id="nu" type="text" placeholder="小写字母、数字、下划线，3–24 位"></div>'
+      + '<div class="f"><label class="l" for="nu">登录名</label><input class="i" id="nu" type="text" placeholder="2–24 位，可用中文、字母、数字"></div>'
       + '<div class="f"><label class="l" for="np">初始密码</label><input class="i" id="np" type="password" placeholder="至少 8 位"></div>'
       + '<div class="f"><label class="l" for="nn">显示名称</label><input class="i" id="nn" type="text" maxlength="16" placeholder="2–16 个字"></div>'
-      + '<div class="f"><label class="l" for="nr">职务</label><input class="i" id="nr" type="text" value="普通成员"></div>'
-      + '<div class="f"><label class="l" for="nf">领域</label><input class="i" id="nf" type="text" value="无"></div>'
+      + '<div class="f"><label class="l" for="nr">职务</label><select class="i" id="nr">' + pickHTML(ROLE_OPTS, "普通成员") + "</select></div>"
+      + '<div class="f"><label class="l" for="nf">领域</label><select class="i" id="nf">' + pickHTML(FIELD_OPTS, "无") + "</select></div>"
       + '<div class="err" id="nerr"></div>'
       + '<div class="actions"><button class="btn" type="button" data-close>取消</button>'
       + '<button class="btn btn--primary" type="button" id="nok">创建</button></div>'
@@ -635,10 +786,10 @@ input,select,button,textarea{font:inherit;color:inherit}
         uname: $("#nu").value.trim(),
         pass: $("#np").value,
         name: $("#nn").value.trim(),
-        role: $("#nr").value.trim() || "普通成员",
-        field: $("#nf").value.trim() || "无"
+        role: $("#nr").value,
+        field: $("#nf").value
       };
-      if (body.uname.length < 3){ e.textContent = "登录名至少 3 位"; e.classList.add("on"); return; }
+      if (body.uname.length < 2){ e.textContent = "登录名至少 2 位"; e.classList.add("on"); return; }
       if (body.pass.length < 8){ e.textContent = "密码至少 8 位"; e.classList.add("on"); return; }
       if (body.name.length < 2){ e.textContent = "显示名称至少 2 个字"; e.classList.add("on"); return; }
       var b = $("#nok");
@@ -656,11 +807,13 @@ input,select,button,textarea{font:inherit;color:inherit}
   }
 
   /* ---------- 事件绑定 ---------- */
+  var timer = null;
   $("#retryBtn").addEventListener("click", open);
   $("#newBtn").addEventListener("click", sheetNew);
   $("#refreshBtn").addEventListener("click", load);
   $("#logoutBtn").addEventListener("click", logout);
   $("#list").addEventListener("click", rowOps);
+  $("#sort").addEventListener("change", load);
   $("#q").addEventListener("input", function(){
     clearTimeout(timer);
     timer = setTimeout(load, 280);
