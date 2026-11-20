@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>规则网络安全团队 · Rule Security</title>
+<meta name="description" content="规则网络安全团队是以方法论为核心的安全研究小组，围绕 Web 安全、系统与权限、防御加固三条主线开展原理研究与合规实践。">
+<meta name="author" content="规则网络安全团队">
+<meta name="robots" content="index, follow">
+<meta name="format-detection" content="telephone=no,email=no,address=no">
+<meta name="theme-color" content="#F6F6F3">
+<script>
+/* 主题在首帧前定档，避免深色用户看到浅色闪屏 */
+(function(){
+  var m = "auto", r = "light";
+  try {
+    var s = localStorage.getItem("rule-sec-theme");
+    if (s === "light" || s === "dark" || s === "auto") m = s;
+  } catch(e){}
+  r = m === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : m;
+  document.documentElement.setAttribute("data-theme", r);
+  document.documentElement.setAttribute("data-theme-mode", m);
+  var mc = document.querySelector('meta[name="theme-color"]');
+  if (mc) mc.setAttribute("content", r === "dark" ? "#0C0D0F" : "#F6F6F3");
+})();
+</script>
+<link rel="canonical" href="https://rule-sec.example/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="规则网络安全团队">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:url" content="https://rule-sec.example/">
+<meta property="og:title" content="规则网络安全团队 · Rule Security">
+<meta property="og:description" content="以方法论为核心的安全研究小组：最小授权、可回滚、可复现。">
+<meta property="og:image" content="https://rule-sec.example/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="规则网络安全团队：把安全研究，做成可复用的方法。">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="规则网络安全团队 · Rule Security">
+<meta name="twitter:description" content="以方法论为核心的安全研究小组：最小授权、可回滚、可复现。">
+<meta name="twitter:image" content="https://rule-sec.example/assets/og-cover.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "规则网络安全团队",
+  "alternateName": "Rule Security",
+  "url": "https://rule-sec.example/",
+  "description": "以方法论为核心的安全研究小组，围绕 Web 安全、系统与权限、防御加固三条主线开展原理研究与合规实践。",
+  "foundingDate": "2026-01",
+  "areaServed": "CN",
+  "knowsAbout": ["Web 安全", "系统与权限", "防御加固", "安全研究方法论"],
+  "contactPoint": [{
+    "@type": "ContactPoint",
+    "contactType": "recruitment",
+    "email": "contact@rule-sec.example",
+    "availableLanguage": ["zh-CN"]
+  }]
+}
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2313151A'/%3E%3Cpath d='M10 23V9h6.2a4.2 4.2 0 010 8.4H13' stroke='%23F6F6F3' fill='none' stroke-width='2.2' stroke-linecap='square'/%3E%3Cpath d='M16.6 17.4L23 23' stroke='%23F6F6F3' stroke-width='2.2' stroke-linecap='square'/%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   设计令牌
+   ============================================================ */
+:root{
+  color-scheme: light;
+  --bg:#F6F6F3;
+  --surface:#FFFFFF;
+  --surface-2:#EFEFEA;
+  --ink:#13151A;
+  --ink-2:#3D434C;
+  --muted:#5F6672;
+  --line:#DEDED7;
+  --line-2:#C3C3BA;
+  --faint:#666D78;
+  --accent:#17594A;
+  --accent-ink:#0E3E33;
+  --accent-soft:rgba(23,89,74,.07);
+  --danger:#9F2B2B;
+  --radius:6px;
+  --shadow:0 1px 2px rgba(19,21,26,.05),0 12px 28px -18px rgba(19,21,26,.28);
+  --maxw:1180px;
+  --header-h:68px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+}
+html[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0C0D0F;
+  --surface:#131518;
+  --surface-2:#191C21;
+  --ink:#E9EBEE;
+  --ink-2:#B7BDC5;
+  --muted:#8F97A2;
+  --line:#23272C;
+  --line-2:#343A41;
+  --faint:#7F8791;
+  --accent:#79C7AC;
+  --accent-ink:#9BD9C2;
+  --accent-soft:rgba(121,199,172,.1);
+  --danger:#E39191;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+
+/* ============================================================
+   基础
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15.5px;
+  line-height:1.72;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  font-feature-settings:"tnum" 0;
+}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.015em;line-height:1.25;text-wrap:balance}
+p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:none;padding:0}
+img{max-width:100%;display:block}
+svg{display:block}
+::selection{background:var(--accent-soft);color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+hr{border:none;border-top:1px solid var(--line);margin:0}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.wrap{width:100%;max-width:var(--maxw);margin:0 auto;padding:0 32px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.skip{
+  position:absolute;left:-9999px;top:0;z-index:200;
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:0 0 var(--radius) 0;font-size:14px;
+}
+.skip:focus{left:0}
+
+/* ============================================================
+   顶部信息条
+   ============================================================ */
+.utility{
+  border-bottom:1px solid var(--line);
+  font-family:var(--mono);
+  font-size:11.5px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.utility .wrap{display:flex;align-items:center;justify-content:space-between;height:34px;gap:16px}
+.utility .left{display:flex;align-items:center;gap:10px;min-width:0}
+.utility .sep{color:var(--faint);opacity:.7}
+.utility .right{display:flex;align-items:center;gap:18px}
+.status{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.status i{width:5px;height:5px;border-radius:50%;background:var(--accent);display:block}
+.theme-toggle{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;padding:2px 0;border-bottom:1px solid transparent;
+  transition:color .18s,border-color .18s;
+}
+.theme-toggle .ic{width:12px;height:12px;flex:none;opacity:.75;transition:opacity .18s}
+.theme-toggle:hover{color:var(--ink);border-color:var(--line-2)}
+.theme-toggle:hover .ic{opacity:1}
+
+/* ============================================================
+   页头
+   ============================================================ */
+.site-head{
+  position:sticky;top:0;z-index:80;
+  background:var(--bg);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:saturate(160%) blur(12px);
+  -webkit-backdrop-filter:saturate(160%) blur(12px);
+  border-bottom:1px solid var(--line);
+  transition:box-shadow .2s;
+}
+/* 不支持背景模糊时必须回到实色，否则文字会与下方内容重叠 */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .site-head{background:var(--bg)}
+}
+.site-head.stuck{box-shadow:0 1px 0 var(--line),0 10px 24px -22px rgba(0,0,0,.5)}
+.site-head .wrap{display:flex;align-items:center;justify-content:space-between;height:var(--header-h);gap:28px}
+
+.brand{display:flex;align-items:baseline;gap:10px;flex-shrink:0}
+.brand .name{font-size:16px;font-weight:600;letter-spacing:.02em}
+.brand .latin{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);padding-bottom:1px;
+}
+
+.nav{display:flex;align-items:center;gap:26px}
+.nav a{
+  position:relative;font-size:13.5px;color:var(--ink-2);white-space:nowrap;
+  padding:6px 0;transition:color .18s;
+}
+.nav a::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .25s cubic-bezier(.4,0,.2,1);
+}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{transform:scaleX(1)}
+.nav a[aria-current="true"]{color:var(--ink)}
+.nav a[aria-current="true"]::after{transform:scaleX(1);background:var(--accent)}
+
+.head-act{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.burger{display:none;width:36px;height:36px;border:1px solid var(--line-2);border-radius:var(--radius);cursor:pointer;align-items:center;justify-content:center}
+.burger span{display:block;width:15px;height:1.5px;background:var(--ink);position:relative}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:15px;height:1.5px;background:var(--ink);transition:transform .2s}
+.burger span::before{top:-5px}
+.burger span::after{top:5px}
+.burger[aria-expanded="true"] span{background:transparent}
+.burger[aria-expanded="true"] span::before{transform:translateY(5px) rotate(45deg)}
+.burger[aria-expanded="true"] span::after{transform:translateY(-5px) rotate(-45deg)}
+
+/* ============================================================
+   按钮
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:42px;padding:0 20px;border-radius:var(--radius);
+  font-size:14px;font-weight:500;letter-spacing:.01em;cursor:pointer;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+  transition:background .18s,border-color .18s,color .18s,transform .18s;
+  white-space:nowrap;
+}
+.btn:hover{border-color:var(--ink);background:var(--surface)}
+.btn:active{transform:translateY(1px)}
+.btn--primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn--primary:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+html[data-theme="dark"] .btn--primary{background:var(--ink);color:#0C0D0F}
+html[data-theme="dark"] .btn--primary:hover{background:var(--accent);color:#0C0D0F}
+.btn--ghost{background:transparent;border-color:var(--line-2)}
+.btn--ghost:hover{background:var(--surface-2);border-color:var(--line-2)}
+.btn--sm{height:36px;padding:0 14px;font-size:13px}
+.btn .arw{width:14px;height:14px;transition:transform .2s}
+.btn:hover .arw{transform:translateX(3px)}
+
+.link-arw{
+  display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--accent);
+  border-bottom:1px solid transparent;transition:border-color .18s,gap .18s;cursor:pointer;
+}
+.link-arw:hover{border-color:currentColor;gap:9px}
+.link-arw svg{width:13px;height:13px}
+
+/* ============================================================
+   版块骨架
+   ============================================================ */
+section{scroll-margin-top:calc(var(--header-h) + 16px)}
+.sec{padding:88px 0;border-top:1px solid var(--line)}
+.sec:first-of-type{border-top:none}
+
+.sec-head{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;gap:24px;margin-bottom:44px;
+  padding-bottom:22px;border-bottom:1px solid var(--line);
+}
+.eyebrow{
+  display:flex;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px;
+}
+.eyebrow b{color:var(--accent);font-weight:500}
+.sec-head h2{font-size:clamp(1.5rem,2.5vw,1.9rem)}
+.sec-head .desc{color:var(--muted);font-size:14px;max-width:34em;margin-top:10px}
+.sec-head .aside{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted);text-align:right;white-space:nowrap;padding-bottom:4px}
+.sec-head--sub{margin-top:72px}
+.sec-head--sub h2{font-size:1.35rem}
+
+/* ============================================================
+   首屏
+   ============================================================ */
+.hero{padding:76px 0 0}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.65fr);gap:56px;align-items:start}
+.hero h1{font-size:clamp(2.05rem,4.4vw,3.15rem);letter-spacing:-.03em;line-height:1.16;margin-bottom:24px}
+.hero .sub{font-size:16px;color:var(--ink-2);max-width:34em;line-height:1.78}
+.hero .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
+.hero .notice{
+  margin-top:22px;display:flex;gap:10px;align-items:flex-start;
+  font-size:13px;color:var(--muted);max-width:40em;line-height:1.65;
+}
+.hero .notice b{font-weight:500;color:var(--ink-2);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;border:1px solid var(--line-2);border-radius:3px;padding:1px 6px;white-space:nowrap;margin-top:2px}
+
+.hero-side{border-left:1px solid var(--line);padding-left:28px}
+.hero-side .k{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.hero-side ul{display:flex;flex-direction:column}
+.hero-side li{
+  display:flex;justify-content:space-between;gap:16px;align-items:baseline;
+  padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--ink-2);
+}
+.hero-side li:first-child{border-top:1px solid var(--line)}
+.hero-side li span:last-child{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+
+/* 指标条 */
+.metrics{
+  margin-top:64px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.metric{padding:26px 24px 24px;border-left:1px solid var(--line);min-width:0}
+.metric:first-child{border-left:none;padding-left:0}
+.metric .num{
+  font-family:var(--mono);font-size:34px;line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--ink);display:flex;align-items:baseline;gap:2px;
+}
+.metric .num small{font-size:13px;color:var(--muted);letter-spacing:.04em;font-weight:400;margin-left:4px}
+.metric .lb{margin-top:10px;font-size:13px;color:var(--muted)}
+.metric .hint{margin-top:4px;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.05em}
+
+/* ============================================================
+   定位 / 边界
+   ============================================================ */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.split > div{padding:34px 34px 30px}
+.split > div + div{border-left:1px solid var(--line);background:var(--surface-2)}
+.split h3{font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.split h3 .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:400}
+.split li{
+  position:relative;padding-left:20px;font-size:14px;color:var(--ink-2);margin-bottom:11px;line-height:1.68;
+}
+.split li:last-child{margin-bottom:0}
+.split li::before{
+  content:"";position:absolute;left:0;top:.72em;width:7px;height:1px;background:var(--line-2);
+}
+.split .no li::before{background:var(--danger);opacity:.55}
+
+/* ============================================================
+   研究方向
+   ============================================================ */
+.toolbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  margin-bottom:8px;padding-bottom:20px;
+}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  height:34px;padding:0 14px;border-radius:4px;border:1px solid var(--line-2);
+  background:transparent;color:var(--ink-2);font-size:13px;cursor:pointer;
+  transition:background .16s,color .16s,border-color .16s;
+}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+html[data-theme="dark"] .chip[aria-pressed="true"]{background:var(--ink);color:#0C0D0F}
+
+.search{
+  margin-left:auto;position:relative;display:flex;align-items:center;
+  border-bottom:1px solid var(--line-2);transition:border-color .18s;
+}
+.search:focus-within{border-color:var(--accent)}
+.search input{
+  width:210px;height:34px;border:none;background:transparent;color:var(--ink);
+  font-family:inherit;font-size:13.5px;padding:0 24px 0 0;outline:none;
+}
+.search input::placeholder{color:var(--muted)}
+.search .clear{
+  position:absolute;right:0;width:18px;height:18px;display:none;align-items:center;justify-content:center;
+  color:var(--muted);cursor:pointer;
+}
+.search .clear.show{display:flex}
+.search .clear:hover{color:var(--ink)}
+.search .clear svg{width:12px;height:12px}
+
+.result-line{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--muted);
+  padding:0 0 18px;text-transform:uppercase;
+}
+
+.spec-list{border-top:1px solid var(--line)}
+.spec{
+  display:grid;grid-template-columns:104px minmax(0,1fr);gap:24px;
+  padding:26px 0;border-bottom:1px solid var(--line);
+  transition:background .18s;
+}
+.spec:hover{background:var(--accent-soft)}
+.spec .sid{
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--muted);
+  padding-top:3px;display:flex;flex-direction:column;gap:6px;
+}
+.spec .sid b{font-weight:500;color:var(--accent);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.spec h3{font-size:16.5px;margin-bottom:8px}
+.spec p{font-size:14px;color:var(--ink-2);max-width:52em;line-height:1.75}
+.spec .points{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:14px}
+.spec .points li{font-size:12.5px;color:var(--muted);display:flex;gap:7px;align-items:baseline}
+.spec .points li::before{content:"";width:5px;height:1px;background:var(--line-2);flex-shrink:0;margin-top:.72em}
+.spec .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.tag{
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-2);border:1px solid var(--line-2);border-radius:3px;padding:2px 7px;
+}
+.empty{padding:56px 0;text-align:center;color:var(--muted);font-size:14px}
+.empty b{display:block;color:var(--ink-2);margin-bottom:6px;font-weight:500}
+
+/* ============================================================
+   成员
+   ============================================================ */
+.roster{border-top:1px solid var(--line)}
+.roster-head,.member{
+  display:grid;grid-template-columns:minmax(220px,1.35fr) minmax(200px,1fr) 88px 40px;
+  gap:20px;align-items:center;
+}
+.roster-head{
+  padding:12px 12px 12px 0;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.member{
+  width:100%;text-align:left;padding:18px 12px 18px 0;border-bottom:1px solid var(--line);
+  cursor:pointer;transition:background .16s;background:none;color:inherit;
+}
+.member:hover{background:var(--accent-soft)}
+.member:hover .go{opacity:1;transform:translateX(0);border-color:var(--accent);background:var(--surface);color:var(--accent)}
+.who{display:flex;align-items:center;gap:13px;min-width:0}
+.av{
+  width:40px;height:40px;flex-shrink:0;border-radius:4px;overflow:hidden;position:relative;
+  border:1px solid var(--line-2);background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;color:var(--ink-2);letter-spacing:.02em;
+}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--surface-2)}
+.av .fb{position:relative;z-index:0}
+.member:hover .av{border-color:var(--accent)}
+.who .nm{display:block;font-size:14.5px;font-weight:500;line-height:1.3}
+.who .sub{display:block;font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono);letter-spacing:.04em}
+.member .tags{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
+.member .since{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.go{width:26px;height:26px;border:1px solid var(--line-2);border-radius:50%;display:flex;align-items:center;justify-content:center;justify-self:end;opacity:.32;transform:none;transition:opacity .18s,transform .18s,border-color .18s,background .18s}
+.go svg{width:11px;height:11px}
+
+/* ============================================================
+   能力评估
+   ============================================================ */
+.bars{display:grid;grid-template-columns:minmax(0,1fr);gap:0;border-top:1px solid var(--line);padding-top:8px}
+.bar{padding:16px 0;border-bottom:1px solid var(--line)}
+.bar .top{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:12px}
+.bar .top span{font-size:14px;color:var(--ink)}
+.bar .top b{font-family:var(--mono);font-size:12.5px;font-weight:400;color:var(--muted);letter-spacing:.04em}
+.track{height:3px;background:var(--line);position:relative;overflow:hidden}
+.fill{height:100%;width:0;background:var(--accent);transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.scale{display:flex;justify-content:space-between;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em}
+.method{
+  margin-top:28px;display:grid;grid-template-columns:110px 1fr;gap:20px;
+  padding-top:22px;border-top:1px solid var(--line);
+}
+.method .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.method p{font-size:13px;color:var(--muted);line-height:1.75;max-width:62em}
+
+/* ============================================================
+   流程
+   ============================================================ */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.step{padding:26px 24px 28px;border-left:1px solid var(--line);position:relative}
+.step:first-child{border-left:none;padding-left:0}
+.step .n{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--accent);margin-bottom:14px}
+.step h3{font-size:14.5px;margin-bottom:9px}
+.step p{font-size:13px;color:var(--muted);line-height:1.72}
+
+/* ============================================================
+   合规准则
+   ============================================================ */
+.rules{border-top:1px solid var(--line)}
+.rule{
+  display:grid;grid-template-columns:56px minmax(0,1fr);gap:20px;
+  padding:22px 0;border-bottom:1px solid var(--line);
+}
+.rule .n{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;padding-top:2px}
+.rule h3{font-size:15px;margin-bottom:7px}
+.rule p{font-size:13.5px;color:var(--ink-2);max-width:58em;line-height:1.74}
+.rules-note{
+  margin-top:26px;padding:20px 24px;border-left:2px solid var(--accent);
+  background:var(--accent-soft);font-size:13.5px;color:var(--ink-2);line-height:1.75;
+}
+
+/* ============================================================
+   里程碑
+   ============================================================ */
+.tl{border-top:1px solid var(--line)}
+.tl-row{
+  display:grid;grid-template-columns:140px 24px minmax(0,1fr);gap:20px;
+  padding:22px 0;border-bottom:1px solid var(--line);align-items:start;
+}
+.tl-row .when{font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--muted);padding-top:2px}
+.tl-row .dot{position:relative;height:100%;display:flex;justify-content:center;padding-top:8px}
+.tl-row .dot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--line-2);transition:background .2s}
+.tl-row:hover .dot::before{background:var(--accent)}
+.tl-row .dot::after{content:"";position:absolute;top:15px;bottom:-24px;width:1px;background:var(--line)}
+.tl-row:last-child .dot::after{display:none}
+.tl-row h3{font-size:15px;margin-bottom:6px}
+.tl-row p{font-size:13.5px;color:var(--muted);max-width:56em;line-height:1.72}
+
+/* ============================================================
+   纪要
+   ============================================================ */
+.notes{border-top:1px solid var(--line)}
+.note{
+  display:grid;grid-template-columns:120px 88px minmax(0,1fr) 76px;gap:20px;align-items:center;
+  padding:17px 0;border-bottom:1px solid var(--line);transition:background .16s;
+}
+.note:hover{background:var(--accent-soft)}
+.note .date{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.03em}
+.note .kind{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid var(--line-2);border-radius:3px;padding:2px 7px;justify-self:start}
+.note .ttl{font-size:14px;color:var(--ink)}
+.note .doc{font-family:var(--mono);font-size:11px;letter-spacing:.09em;color:var(--muted);text-align:right}
+
+/* ============================================================
+   问答
+   ============================================================ */
+.acc{border-top:1px solid var(--line)}
+.acc-item{border-bottom:1px solid var(--line)}
+.acc-btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:24px;
+  padding:20px 0;text-align:left;cursor:pointer;font-size:15px;color:var(--ink);
+  transition:color .18s;
+}
+.acc-btn:hover{color:var(--accent)}
+.acc-btn .ico{width:14px;height:14px;flex-shrink:0;color:var(--muted);transition:transform .25s}
+.acc-item[data-open="true"] .acc-btn .ico{transform:rotate(180deg)}
+.acc-panel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s cubic-bezier(.4,0,.2,1)}
+.acc-item[data-open="true"] .acc-panel{grid-template-rows:1fr}
+.acc-panel > div{overflow:hidden}
+.acc-panel p{padding:0 40px 22px 0;font-size:14px;color:var(--muted);line-height:1.78;max-width:58em}
+
+/* ============================================================
+   申请
+   ============================================================ */
+.join-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.6fr);gap:64px;align-items:start}
+.form-wrap{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:34px}
+.field{margin-bottom:20px}
+.field:last-of-type{margin-bottom:0}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+label,.lab{
+  display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:8px;font-weight:500;
+  display:flex;align-items:baseline;gap:6px;
+}
+label .req{color:var(--danger);font-family:var(--mono);font-size:11px}
+label .hint{font-weight:400;color:var(--muted);font-size:11.5px;font-family:var(--mono);letter-spacing:.03em}
+label .count{
+  margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+  color:var(--muted);font-weight:400;transition:color .16s;
+}
+label .count.warn{color:var(--danger)}
+input[type="text"],select,textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:4px;
+  color:var(--ink);font-family:inherit;font-size:14px;padding:10px 12px;
+  transition:border-color .16s,box-shadow .16s;
+}
+input[type="text"]{height:42px}
+textarea{resize:vertical;min-height:104px;line-height:1.7}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--danger)}
+select{
+  height:42px;appearance:none;cursor:pointer;padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%235F6672' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;background-size:12px;
+}
+html[data-theme="dark"] select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%238F97A2' stroke-width='1.4'/%3E%3C/svg%3E");
+}
+.field-err{font-size:12px;color:var(--danger);margin-top:6px;min-height:0;display:none}
+.field-err.show{display:block}
+
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-2);line-height:1.65;cursor:pointer}
+.check input{
+  appearance:none;width:16px;height:16px;flex-shrink:0;margin-top:2px;border:1px solid var(--line-2);
+  border-radius:3px;background:var(--bg);cursor:pointer;position:relative;transition:background .15s,border-color .15s;
+}
+.check input:checked{background:var(--accent);border-color:var(--accent)}
+.check input:checked::after{
+  content:"";position:absolute;left:4.6px;top:1.4px;width:4px;height:8px;
+  border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(42deg);
+}
+.form-foot{display:flex;align-items:center;gap:18px;margin-top:26px;flex-wrap:wrap}
+.form-foot .meta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+
+/* 成功态 */
+.success{border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:var(--radius);background:var(--surface);padding:38px}
+.success .k{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.success h3{font-size:18px;margin-bottom:10px}
+.success p{font-size:14px;color:var(--muted);max-width:40em;line-height:1.75}
+.receipt{
+  margin:24px 0;padding:18px 20px;border:1px dashed var(--line-2);border-radius:4px;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;background:var(--bg);
+}
+.receipt div span{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.receipt div b{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--ink);letter-spacing:.03em}
+.receipt .wide{grid-column:1 / -1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.receipt .wide span{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0}
+.receipt .wide b{font-size:14px;letter-spacing:.06em}
+.copy-btn{
+  margin-left:auto;height:26px;padding:0 10px;border:1px solid var(--line-2);border-radius:3px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);cursor:pointer;
+  transition:color .16s,border-color .16s,background .16s;
+}
+.copy-btn:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.success:focus,.success:focus-visible{outline:none}
+
+.contact{border-top:1px solid var(--line);padding-top:22px}
+.contact .row{display:flex;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.contact .row .k{color:var(--muted)}
+.contact .row .v{font-family:var(--mono);font-size:12.5px;color:var(--ink);letter-spacing:.02em;text-align:right}
+.contact-note{margin-top:18px;font-size:12.5px;color:var(--muted);line-height:1.7}
+
+/* ============================================================
+   页脚
+   ============================================================ */
+footer{border-top:1px solid var(--line);margin-top:0;padding:56px 0 34px;background:var(--surface)}
+.foot-grid{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,.8fr));gap:44px;padding-bottom:40px;border-bottom:1px solid var(--line)}
+.foot-brand .name{font-size:15px;font-weight:600;margin-bottom:10px}
+.foot-brand p{font-size:13px;color:var(--muted);max-width:26em;line-height:1.75}
+.foot-col h3{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:14px}
+.foot-col li{margin-bottom:9px}
+.foot-col a{font-size:13px;color:var(--ink-2);transition:color .16s}
+.foot-col a:hover{color:var(--accent)}
+.foot-bottom{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;padding-top:24px;font-size:12.5px;color:var(--muted)}
+.foot-bottom .legal{display:flex;gap:20px;flex-wrap:wrap}
+.foot-note{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.02em}
+.noscript-note{padding:16px 32px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);background:var(--surface-2)}
+
+/* 返回顶部 */
+.to-top{
+  position:fixed;right:26px;bottom:26px;width:42px;height:42px;z-index:70;
+  border:1px solid var(--line-2);border-radius:4px;background:var(--surface);
+  color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;
+  opacity:0;pointer-events:none;transform:translateY(6px);
+  transition:opacity .22s,transform .22s,border-color .18s;box-shadow:var(--shadow);
+}
+.to-top.show{opacity:1;pointer-events:auto;transform:none}
+.to-top:hover{border-color:var(--ink)}
+.to-top svg{width:13px;height:13px}
+
+/* 提示条 */
+.toast{
+  position:fixed;left:26px;bottom:26px;z-index:95;
+  display:flex;align-items:center;gap:10px;
+  padding:11px 16px;border:1px solid var(--line-2);border-left:3px solid var(--accent);
+  border-radius:4px;background:var(--surface);color:var(--ink);font-size:13px;
+  box-shadow:var(--shadow);opacity:0;transform:translateY(8px);pointer-events:none;
+  transition:opacity .22s,transform .22s;max-width:min(420px,calc(100vw - 52px));
+}
+.toast.show{opacity:1;transform:none}
+
+/* ============================================================
+   弹层
+   ============================================================ */
+.modal{position:fixed;inset:0;z-index:120;display:none}
+.modal.open{display:block}
+.modal-bg{position:absolute;inset:0;background:rgba(12,13,15,.42);backdrop-filter:blur(3px);animation:fade .2s ease}
+.modal-card{
+  position:relative;max-width:560px;margin:0 auto;top:50%;transform:translateY(-50%);
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);
+  padding:34px;box-shadow:0 24px 60px -30px rgba(0,0,0,.5);animation:rise .22s cubic-bezier(.16,1,.3,1);
+  max-height:calc(100vh - 64px);overflow:auto;
+}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(-46%)}to{opacity:1;transform:translateY(-50%)}}
+.modal-close{
+  position:absolute;right:14px;top:14px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;border-radius:4px;color:var(--muted);cursor:pointer;transition:color .16s,border-color .16s;
+}
+.modal-close:hover{color:var(--ink);border-color:var(--line-2)}
+.modal-close svg{width:12px;height:12px}
+.modal-head{display:flex;align-items:center;gap:14px;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.modal-head .av{width:46px;height:46px;font-size:15px}
+.modal-head h3{font-size:17px}
+.modal-head .sub{font-size:12.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em;margin-top:3px}
+.kv{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px 18px;font-size:13.5px}
+.kv .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.kv .v{color:var(--ink-2);line-height:1.7}
+.modal-tags{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ============================================================
+   入场动画
+   ============================================================ */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s cubic-bezier(.16,1,.3,1)}
+.rv.in{opacity:1;transform:none}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width:1080px){
+  .hero-grid{grid-template-columns:1fr;gap:40px}
+  .hero-side{border-left:none;padding-left:0;border-top:1px solid var(--line);padding-top:24px}
+  .join-grid{grid-template-columns:1fr;gap:40px}
+  .bars{grid-template-columns:1fr;gap:0}
+  .steps{grid-template-columns:1fr 1fr}
+  .step:nth-child(3){border-left:none;padding-left:0}
+  .step:nth-child(n+3){border-top:1px solid var(--line)}
+  .foot-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:860px){
+  .wrap{padding:0 22px}
+  .nav{
+    position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;
+    background:var(--bg);border-bottom:1px solid var(--line);
+    padding:6px 22px 14px;display:none;
+  }
+  .nav.open{display:flex}
+  .nav a{padding:13px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .nav a:last-child{border-bottom:none}
+  .nav a::after{display:none}
+  .burger{display:flex}
+  .head-act .btn{display:none}
+  .sec{padding:64px 0}
+  .hero{padding:52px 0 0}
+  .sec-head{grid-template-columns:1fr;gap:12px;align-items:start;margin-bottom:32px}
+  .sec-head .aside{text-align:left;padding:0}
+  .metrics{grid-template-columns:1fr 1fr}
+  .metric{padding:22px 18px}
+  .metric:nth-child(3){border-left:none;padding-left:0}
+  .metric:nth-child(n+3){border-top:1px solid var(--line)}
+  .split{grid-template-columns:1fr}
+  .split > div + div{border-left:none;border-top:1px solid var(--line)}
+  .spec{grid-template-columns:1fr;gap:10px}
+  .spec .sid{flex-direction:row;align-items:center;gap:10px}
+  .roster-head{display:none}
+  .member{grid-template-columns:1fr 40px;gap:14px;padding:18px 0}
+  .member .tags,.member .since{display:none}
+  .member .go{opacity:1;transform:none}
+  .note{grid-template-columns:96px minmax(0,1fr) 66px;gap:12px}
+  .note .kind{display:none}
+  .note .doc{font-size:11px}
+  .tc-wrap{overflow:hidden}
+  .form-wrap{padding:24px}
+  .field-row{grid-template-columns:1fr;gap:0}
+  .receipt{grid-template-columns:1fr}
+  .modal-card{max-width:calc(100vw - 32px);padding:26px;top:auto;bottom:0;transform:none;border-radius:var(--radius) var(--radius) 0 0}
+  @keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:26px 20px}
+  .foot-brand{grid-column:1 / -1}
+  .foot-col:last-child{grid-column:1 / -1}
+  .foot-col:last-child ul{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  .foot-col li a{min-height:38px}
+  .to-top{right:18px;bottom:18px}
+  .toast{left:18px;bottom:76px;right:18px}
+  .tl-row{grid-template-columns:1fr;gap:8px}
+  .tl-row .dot{display:none}
+  .utility{font-size:11px;letter-spacing:.06em}
+  .utility .wrap{gap:10px}
+  .utility .left,.utility .right{min-width:0;gap:10px}
+  .utility .wrap span{white-space:nowrap}
+  .utility .left .hide-sm{display:none}
+  .utility .sep{display:none}
+  .theme-toggle{flex:none;white-space:nowrap}
+  .toolbar{align-items:flex-start}
+  .search{margin-left:0;width:100%}
+  .search input{width:100%}
+
+  /* 移动端触控目标不小于 40px（WCAG 2.5.5 / iOS HIG） */
+  .utility .wrap{height:40px}
+  .theme-toggle{height:40px;padding:0 2px}
+  .brand{min-height:40px;align-items:center}
+  .burger{width:40px;height:40px}
+  .chip{height:40px}
+  .search input{height:42px}
+  .modal-close{width:40px;height:40px}
+  .acc-btn{min-height:52px}
+  .foot-col li a{display:inline-flex;align-items:center;min-height:40px}
+  .check{min-height:44px;align-items:flex-start;padding-top:2px}
+  .check input{width:20px;height:20px;margin-top:0;flex:none}
+  .check input:checked::after{left:6.2px;top:2.4px;width:4.6px;height:9px}
+}
+@media (max-width:480px){
+  .hero h1{font-size:1.85rem}
+  .metric .num{font-size:28px}
+  .steps{grid-template-columns:1fr}
+  .step{border-left:none;padding-left:0}
+  .step:nth-child(n+2){border-top:1px solid var(--line)}
+}
+
+/* ============================================================
+   动效降级 / 打印
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
+  .rv{opacity:1;transform:none}
+}
+@media (prefers-contrast:more){
+  :root{--muted:#454B55;--faint:#4C5460;--line:#B9B9B0;--line-2:#8E8E84;--ink-2:#2A2F37}
+  html[data-theme="dark"]{--muted:#B3BAC4;--faint:#A6ADB8;--line:#3C434B;--line-2:#5A636E;--ink-2:#D2D7DE}
+  .btn--ghost{border-color:var(--ink-2)}
+  .chip{border-color:var(--line-2)}
+  input[type="text"],select,textarea{border-color:var(--line-2)}
+  :focus-visible{outline-width:3px}
+}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--surface-2:#fff;--ink:#000;--ink-2:#222;--muted:#555;--line:#bbb;--line-2:#999;--accent:#000}
+  .site-head,.utility,.to-top,.toast,.modal,.burger,.head-act,.hero .actions,.form-wrap,.toolbar,.go{display:none!important}
+  body{font-size:11pt}
+  .sec{padding:24px 0;break-inside:avoid}
+  .rv{opacity:1!important;transform:none!important}
+  .item,.spec,.member,.rule,.tl-row{break-inside:avoid}
+  a[href^="#"]::after{content:""}
+  main a[href]{text-decoration:none;color:#000}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<!-- 顶部信息条 -->
+<div class="utility">
+  <div class="wrap">
+    <div class="left">
+      <span>Rule Security</span>
+      <span class="sep">/</span>
+      <span class="hide-sm">安全研究小组 · 内部站点</span>
+    </div>
+    <div class="right">
+      <span class="status"><i></i>研究进行中</span>
+      <span class="sep">/</span>
+      <span class="hide-sm" id="clock">--:--</span>
+      <button class="theme-toggle" id="themeBtn" type="button" aria-label="切换外观">
+        <svg class="ic" id="themeIcon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="8"/><path d="M6 13.5h4M8 11v2.5"/></svg>
+        <span id="themeLabel">跟随系统</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 页头 -->
+<header class="site-head" id="siteHead">
+  <div class="wrap">
+    <a class="brand" href="#sec-overview">
+      <span class="name">规则网络安全团队</span>
+      <span class="latin">Rule Security</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="主导航">
+      <a href="#sec-overview">概览</a>
+      <a href="#sec-research">研究方向</a>
+      <a href="#sec-members">团队成员</a>
+      <a href="#sec-capability">能力与流程</a>
+      <a href="#sec-compliance">合规准则</a>
+      <a href="#sec-faq">常见问题</a>
+    </nav>
+    <div class="head-act">
+      <a class="btn btn--primary btn--sm" href="#sec-join">提交申请</a>
+      <button class="burger" id="burger" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="nav"><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ========== 首屏 ========== -->
+  <section id="sec-overview" class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div class="rv">
+          <div class="eyebrow"><b>01</b><span>Overview / 团队概览</span></div>
+          <h1>把安全研究，做成<br>可复用的方法。</h1>
+          <p class="sub">
+            规则网络安全团队是一个以方法论为核心的安全研究小组，围绕 Web 安全、系统与权限、防御加固三条主线开展原理研究。
+            所有实验都在隔离的本地环境或已取得书面授权的范围内完成，并以文档形式沉淀为团队可持续使用的基线。
+          </p>
+          <div class="actions">
+            <a class="btn btn--primary" href="#sec-join">
+              提交加入申请
+              <svg class="arw" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5"/></svg>
+            </a>
+            <a class="btn btn--ghost" href="#sec-research">查看研究方向</a>
+          </div>
+          <div class="notice">
+            <b>原则</b>
+            <span>最小授权 · 可回滚 · 可复现。任何练习仅限自有设备、本地隔离环境或书面授权范围。</span>
+          </div>
+        </div>
+        <aside class="hero-side rv">
+          <div class="k">Quick facts</div>
+          <ul>
+            <li><span>成立时间</span><span>2025 · 春</span></li>
+            <li><span>方向分组</span><span>03</span></li>
+            <li><span>工作语言</span><span>ZH / EN</span></li>
+            <li><span>材料等级</span><span>内部</span></li>
+            <li><span>最近更新</span><span id="lastUpdate">—</span></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="metrics rv" id="metrics">
+        <div class="metric">
+          <div class="num"><span data-count="0" id="mMembers">0</span><small>人</small></div>
+          <div class="lb">在册成员</div>
+          <div class="hint">含核心与协作成员</div>
+        </div>
+        <div class="metric">
+          <div class="num"><span data-count="0" id="mResearch">0</span><small>项</small></div>
+          <div class="lb">在研方向</div>
+          <div class="hint">按 R-xx 编号管理</div>
+        </div>
+        <div class="metric">
+          <div class="num"><span data-count="0" id="mNotes">0</span><small>篇</small></div>
+          <div class="lb">内部纪要</div>
+          <div class="hint">近 12 个月累计</div>
+        </div>
+        <div class="metric">
+          <div class="num"><span data-count="0" id="mRules">0</span><small>条</small></div>
+          <div class="lb">合规准则</div>
+          <div class="hint">全员签署确认</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 定位与边界 ========== -->
+  <section class="sec" id="sec-position">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>02</b><span>Position / 定位与边界</span></div>
+          <h2>我们做什么，不做什么</h2>
+          <p class="desc">把边界写在前面，比事后解释更省成本。以下内容对全体成员与申请者同样适用。</p>
+        </div>
+        <div class="aside">REV. 2026-11</div>
+      </div>
+      <div class="split rv">
+        <div>
+          <h3><span class="k">In scope</span>在范围内</h3>
+          <ul>
+            <li>漏洞原理、成因与防护思路的系统性梳理</li>
+            <li>在本地隔离环境中搭建可回滚的复现与验证环境</li>
+            <li>协议、权限、日志与基线层面的可观测性研究</li>
+            <li>面向自有资产的安全加固与配置核查</li>
+            <li>形成文档化的流程、清单与技术纪要</li>
+          </ul>
+        </div>
+        <div class="no">
+          <h3><span class="k">Out of scope</span>不在范围内</h3>
+          <ul>
+            <li>针对任何未授权目标的探测、访问或影响</li>
+            <li>制作、传播或提供可被滥用的攻击工具</li>
+            <li>绕过真实系统的安全控制以获取利益</li>
+            <li>处理、交易或扩散他人数据与凭证</li>
+            <li>以团队名义对外承接渗透类商业委托</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 研究方向 ========== -->
+  <section class="sec" id="sec-research">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>03</b><span>Research / 研究方向</span></div>
+          <h2>在研方向</h2>
+          <p class="desc">每个方向对应固定编号、负责成员与产出物，按季度复核一次。</p>
+        </div>
+        <div class="aside">共 <span id="dirTotal">06</span> 项</div>
+      </div>
+
+      <div class="toolbar rv">
+        <div class="filters" id="dirChips" role="group" aria-label="按分组筛选研究方向">
+          <button class="chip" type="button" data-cat="all" aria-pressed="true">全部</button>
+          <button class="chip" type="button" data-cat="web" aria-pressed="false">Web 安全</button>
+          <button class="chip" type="button" data-cat="system" aria-pressed="false">系统与权限</button>
+          <button class="chip" type="button" data-cat="defense" aria-pressed="false">防御加固</button>
+        </div>
+        <div class="search">
+          <label for="kw" class="sr-only">搜索研究方向</label>
+          <input type="text" id="kw" placeholder="搜索方向、关键词" autocomplete="off">
+          <button class="clear" id="kwClear" type="button" aria-label="清空搜索">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="result-line" id="dirResult" aria-live="polite"></div>
+      <div class="spec-list" id="dirList"></div>
+    </div>
+  </section>
+
+  <!-- ========== 成员 ========== -->
+  <section class="sec" id="sec-members">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>04</b><span>Team / 团队成员</span></div>
+          <h2>成员名单</h2>
+          <p class="desc">点击任一行查看该成员的方向、职责与在研项目。</p>
+        </div>
+        <div class="aside">共 <span id="memTotal">05</span> 人</div>
+      </div>
+
+      <div class="toolbar rv">
+        <div class="filters" id="memChips" role="group" aria-label="按分组筛选成员">
+          <button class="chip" type="button" data-cat="all" aria-pressed="true">全部</button>
+          <button class="chip" type="button" data-cat="web" aria-pressed="false">Web 方向</button>
+          <button class="chip" type="button" data-cat="system" aria-pressed="false">系统方向</button>
+          <button class="chip" type="button" data-cat="defense" aria-pressed="false">防御方向</button>
+        </div>
+      </div>
+
+      <div class="result-line" id="memResult" aria-live="polite"></div>
+      <div class="roster rv">
+        <div class="roster-head" aria-hidden="true">
+          <span>成员 / 职责</span><span>关注领域</span><span>加入</span><span></span>
+        </div>
+        <div id="memList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 能力与流程 ========== -->
+  <section class="sec" id="sec-capability">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>05</b><span>Capability / 能力与流程</span></div>
+          <h2>能力评估与工作流程</h2>
+          <p class="desc">评估用于分配研究方向与排期，不代表个人水平排序。</p>
+        </div>
+        <div class="aside">自评 · 2026 Q4</div>
+      </div>
+
+      <div class="bars rv" id="skillBars"></div>
+
+      <div class="method rv">
+        <div class="k">Method</div>
+        <p>
+          评估口径：由各方向负责人按「可独立完成的任务范围」打分，综合文档产出、环境搭建与复盘质量三项；
+          每季度复核一次，仅用于团队内部排期与人员分配，不对外发布，也不作为绩效依据。
+        </p>
+      </div>
+
+      <div class="sec-head sec-head--sub rv">
+        <div>
+          <h2>一次研究的完整流程</h2>
+          <p class="desc">四个环节缺一不可，任一环节未完成则议题不结项。</p>
+        </div>
+        <div class="aside">SOP · 4 STEP</div>
+      </div>
+
+      <div class="steps rv">
+        <div class="step">
+          <div class="n">STEP 01</div>
+          <h3>议题提出</h3>
+          <p>说明研究目标、边界、所需环境与预期产出，登记进入议题列表并指派负责人。</p>
+        </div>
+        <div class="step">
+          <div class="n">STEP 02</div>
+          <h3>授权确认</h3>
+          <p>明确环境归属与授权形式，仅限自有设备、本地隔离环境或书面授权范围内的资产。</p>
+        </div>
+        <div class="step">
+          <div class="n">STEP 03</div>
+          <h3>隔离实验</h3>
+          <p>在可回滚快照的虚拟机中执行，全程记录步骤、参数与结果，异常即停止并复盘。</p>
+        </div>
+        <div class="step">
+          <div class="n">STEP 04</div>
+          <h3>复盘归档</h3>
+          <p>输出技术纪要与防护建议，同步更新内部基线与检查清单，材料按等级归档。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 合规准则 ========== -->
+  <section class="sec" id="sec-compliance">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>06</b><span>Compliance / 合规准则</span></div>
+          <h2>五条准则</h2>
+          <p class="desc">新成员加入后的第一件事是逐条确认本页内容。</p>
+        </div>
+        <div class="aside">全员确认</div>
+      </div>
+
+      <div class="rules rv">
+        <div class="rule">
+          <div class="n">01</div>
+          <div>
+            <h3>最小授权</h3>
+            <p>任何测试只针对自有资产或已取得书面授权的环境；范围以书面记录为准，超出范围立即停止并上报。</p>
+          </div>
+        </div>
+        <div class="rule">
+          <div class="n">02</div>
+          <div>
+            <h3>可回滚</h3>
+            <p>实验前建立环境快照，结束后恢复原状，确保系统、数据与配置能够完整回到初始状态。</p>
+          </div>
+        </div>
+        <div class="rule">
+          <div class="n">03</div>
+          <div>
+            <h3>可复现</h3>
+            <p>记录完整步骤、参数与版本信息，使结论能够被他人独立验证，避免只有结论没有过程。</p>
+          </div>
+        </div>
+        <div class="rule">
+          <div class="n">04</div>
+          <div>
+            <h3>不外传</h3>
+            <p>内部材料仅在团队范围内流转，不公开发布可能被直接复用的实现细节，引用需注明来源与用途。</p>
+          </div>
+        </div>
+        <div class="rule">
+          <div class="n">05</div>
+          <div>
+            <h3>漏洞处置</h3>
+            <p>在真实环境发现问题时，第一时间联系资产所有者，按约定流程提交、跟踪与披露，不做二次扩散。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rules-note rv">
+        准则适用于团队全部研究工作、内部材料与对外交流。对条款有疑问时，以书面沟通记录为准，先沟通后执行。
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 里程碑 ========== -->
+  <section class="sec" id="sec-milestones">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>07</b><span>Milestone / 团队历程</span></div>
+          <h2>关键节点</h2>
+        </div>
+        <div class="aside">2025 — 2026</div>
+      </div>
+
+      <div class="tl rv">
+        <div class="tl-row">
+          <div class="when">2025 · 春</div>
+          <div class="dot"></div>
+          <div>
+            <h3>团队成立</h3>
+            <p>几名安全爱好者组成小组，确立「合规、授权、本地实验」的研究原则，并形成最初的议题清单。</p>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="when">2025 · 夏</div>
+          <div class="dot"></div>
+          <div>
+            <h3>实验环境落地</h3>
+            <p>完成本地隔离实验环境的搭建与快照机制，梳理 Web、系统与防御三条主线的基础知识地图。</p>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="when">2025 · 秋</div>
+          <div class="dot"></div>
+          <div>
+            <h3>方向分组</h3>
+            <p>按 Web、系统、防御三个方向分工，明确负责人、议题编号与产出物格式，开始按季度推进。</p>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="when">2026 · 至今</div>
+          <div class="dot"></div>
+          <div>
+            <h3>纪要机制成型</h3>
+            <p>建立「议题—实验—纪要—基线」的闭环，内部纪要按月归档，检查清单随环境变化版本化更新。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 纪要 ========== -->
+  <section class="sec" id="sec-notes">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>08</b><span>Notes / 内部纪要</span></div>
+          <h2>近期产出</h2>
+          <p class="desc">仅列出标题与类型，正文按材料等级在团队内部流转。</p>
+        </div>
+        <div class="aside">近 12 个月</div>
+      </div>
+      <div class="notes rv" id="noteList"></div>
+    </div>
+  </section>
+
+  <!-- ========== 常见问题 ========== -->
+  <section class="sec" id="sec-faq">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>09</b><span>FAQ / 常见问题</span></div>
+          <h2>你可能想问</h2>
+        </div>
+        <div class="aside">申请前建议阅读</div>
+      </div>
+      <div class="acc rv" id="faqList"></div>
+    </div>
+  </section>
+
+  <!-- ========== 申请 ========== -->
+  <section class="sec" id="sec-join">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div>
+          <div class="eyebrow"><b>10</b><span>Join / 加入我们</span></div>
+          <h2>提交加入申请</h2>
+          <p class="desc">表单仅作本地演示，数据不会上传服务器；刷新页面即清空。</p>
+        </div>
+        <div class="aside">受理时限 · 3 个工作日</div>
+      </div>
+
+      <div class="join-grid">
+        <div class="rv">
+          <div id="formSlot">
+            <form class="form-wrap" id="joinForm" novalidate>
+              <div class="field-row">
+                <div class="field">
+                  <label for="fName">昵称<span class="req">必填</span><span class="hint">2–16 字</span><span class="count" id="cName" aria-hidden="true">0 / 16</span></label>
+                  <input type="text" id="fName" name="name" maxlength="16" autocomplete="nickname" aria-required="true" aria-describedby="eName">
+                  <div class="field-err" id="eName"></div>
+                </div>
+                <div class="field">
+                  <label for="fDir">意向方向<span class="req">必填</span></label>
+                  <select id="fDir" name="dir">
+                    <option value="web">Web 安全</option>
+                    <option value="system">系统与权限</option>
+                    <option value="defense">防御加固</option>
+                    <option value="undecided">尚未确定</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label for="fLevel">当前基础<span class="hint">可选</span></label>
+                  <select id="fLevel" name="level">
+                    <option value="none">刚接触，从零开始</option>
+                    <option value="basic">了解基础概念</option>
+                    <option value="project">有个人项目经验</option>
+                    <option value="work">有相关工作经历</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="fHours">每周可投入<span class="hint">可选</span></label>
+                  <select id="fHours" name="hours">
+                    <option value="1-3">1–3 小时</option>
+                    <option value="4-6">4–6 小时</option>
+                    <option value="7-10">7–10 小时</option>
+                    <option value="10+">10 小时以上</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="fMsg">自我介绍<span class="req">必填</span><span class="hint">不少于 10 字</span><span class="count" id="cMsg" aria-hidden="true">0 / 500</span></label>
+                <textarea id="fMsg" name="msg" maxlength="500" placeholder="简单说明你的基础、想学的方向，以及希望在团队里做成什么" aria-required="true" aria-describedby="eMsg"></textarea>
+                <div class="field-err" id="eMsg"></div>
+              </div>
+
+              <div class="field">
+                <label class="check">
+                  <input type="checkbox" id="fAgree" aria-required="true" aria-describedby="eAgree">
+                  <span>我已阅读并同意《合规准则》，承诺所有练习仅在自有设备、本地隔离环境或书面授权范围内进行。</span>
+                </label>
+                <div class="field-err" id="eAgree"></div>
+              </div>
+
+              <div class="form-foot">
+                <button class="btn btn--primary" type="submit">
+                  提交申请
+                  <svg class="arw" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5"/></svg>
+                </button>
+                <span class="meta" id="formMeta">本地演示 · 不联网</span>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <aside class="rv">
+          <div class="contact">
+            <div class="row"><span class="k">联系方式</span><span class="v">contact@rule-sec.example</span></div>
+            <div class="row"><span class="k">受理时限</span><span class="v">3 个工作日</span></div>
+            <div class="row"><span class="k">面谈安排</span><span class="v">线上 30 分钟</span></div>
+            <div class="row"><span class="k">材料等级</span><span class="v">内部</span></div>
+          </div>
+          <p class="contact-note">
+            我们更关注你的学习方式而非现有水平：能否把一次实验讲清楚、能否把结论写成别人可复现的文档，
+            这两点比掌握多少工具更重要。
+          </p>
+        </aside>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ========== 页脚 ========== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="name">规则网络安全团队</div>
+        <p>以方法论为核心的安全研究小组。全部研究在自有设备、本地隔离环境或书面授权范围内完成。</p>
+      </div>
+      <div class="foot-col">
+        <h3>站点</h3>
+        <ul>
+          <li><a href="#sec-overview">团队概览</a></li>
+          <li><a href="#sec-research">研究方向</a></li>
+          <li><a href="#sec-members">团队成员</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h3>规范</h3>
+        <ul>
+          <li><a href="#sec-capability">工作流程</a></li>
+          <li><a href="#sec-compliance">合规准则</a></li>
+          <li><a href="#sec-faq">常见问题</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h3>联系</h3>
+        <ul>
+          <li><a href="#sec-join">提交申请</a></li>
+          <li><a href="mailto:contact@rule-sec.example">contact@rule-sec.example</a></li>
+          <li><span class="foot-note">受理 3 个工作日</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 规则网络安全团队 · 仅用于学习交流</span>
+      <span class="legal">
+        <span>最小授权 · 可回滚 · 可复现</span>
+        <span class="mono" id="footRev">REV 2026-11</span>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<button class="to-top" id="toTop" type="button" aria-label="回到顶部">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 13V3M4.5 6.5L8 3l3.5 3.5"/></svg>
+</button>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- 成员详情弹层 -->
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="modal-bg" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalName">
+    <button class="modal-close" type="button" data-close aria-label="关闭">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+    </button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<noscript>
+  <div class="noscript-note">
+    本页的动态内容（研究方向、成员名单、问答）需要 JavaScript 才能渲染。
+  </div>
+</noscript>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ==========================================================
+     数据区（只改这里）
+     ========================================================== */
+  const DIRECTIONS = [
+    { id:"R-01", cat:"web", title:"Web 安全",
+      desc:"从一次请求的完整生命周期出发，理解注入、鉴权与访问控制类问题的成因，在隔离环境中复现并记录防护要点。",
+      points:["HTTP 报文与会话机制","输入校验与参数化","权限边界与最小授权"],
+      tags:["HTTP","鉴权","输入校验"] },
+    { id:"R-02", cat:"system", title:"系统与权限",
+      desc:"研究操作系统账户、服务与文件权限的组织方式，建立可核查、可重复执行的加固基线。",
+      points:["账户与权限模型","服务与自启动项","文件与目录基线"],
+      tags:["权限","服务","基线"] },
+    { id:"R-03", cat:"defense", title:"防御加固",
+      desc:"以日志、补丁与监控三条线索构建可运营的防御流程，强调可观测、可回溯、可度量。",
+      points:["日志采集与留存","补丁与版本管理","异常检测思路"],
+      tags:["日志","补丁","监控"] },
+    { id:"R-04", cat:"web", title:"协议分析",
+      desc:"在受控网络中使用抓包工具观察协议交互，理解封装、握手与状态机，形成可复用的分析记录。",
+      points:["TCP/IP 分层模型","TLS 握手过程","流量分析记录"],
+      tags:["抓包","TCP/IP","TLS"] },
+    { id:"R-05", cat:"system", title:"逆向基础",
+      desc:"在自行构建或公开的练习样本上学习程序结构与静态分析的基本方法，重点在读懂而非破解。",
+      points:["可执行文件结构","调用与控制流","静态分析记录"],
+      tags:["静态分析","结构"] },
+    { id:"R-06", cat:"defense", title:"应急响应",
+      desc:"按取证优先的顺序处理异常事件：先保全证据，再定位原因，最后处置与复盘，避免破坏现场。",
+      points:["现场保全","时间线还原","复盘与改进"],
+      tags:["取证","排查","复盘"] }
+  ];
+
+  const MEMBERS = [
+    { name:"小浩", initial:"浩", role:"创始人 · 团队统筹", cat:"web", since:"2025",
+      avatar:"data:image/jpeg;base64,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",
+      focus:["Web","团队统筹","流程设计"],
+      duty:"负责议题排期、授权流程确认与材料归档规范，是外部沟通的第一联系人。",
+      projects:["R-01 Web 安全","团队流程 SOP","授权与归档规范"] },
+    { name:"星途", initial:"途", role:"系统方向负责人", cat:"system", since:"2025",
+      avatar:"data:image/jpeg;base64,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",
+      focus:["漏洞原理","协议","系统加固"],
+      duty:"负责系统与权限主线，维护本地实验环境基线与快照策略。",
+      projects:["R-02 系统与权限","R-05 逆向基础","环境基线 v1.2"] },
+    { name:"小军", initial:"军", role:"防御方向负责人", cat:"defense", since:"2025",
+      avatar:"data:image/jpeg;base64,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",
+      focus:["日志分析","系统","加固"],
+      duty:"负责防御与监控主题，整理日志留存方案与排查清单。",
+      projects:["R-03 防御加固","R-06 应急响应","日志留存清单"] },
+    { name:"离开", initial:"离", role:"成员", cat:"system", since:"2025",
+      avatar:"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwQDAwQEBAQFBQQFBwsHBwYGBw4KCggLEA4RERAOEA8SFBoWEhMYEw8QFh8XGBsbHR0dERYgIh8cIhocHRz/2wBDAQUFBQcGBw0HBw0cEhASHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBz/wgARCAB4AHgDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAABQYAAwQHAgH/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQL/2gAMAwEAAhADEAAAAWbeOIxVn0UnqqwEY0dsoxscF+OMKjroVE+FwF+p2eYpqCy6m2xRX781nWmNRjETGjc7NgtwzI+rMi5Wr5Vfudln2XPPOh8t6kZp89HhGfufwOzzdnWByQTJTmu8oP13HrWqFJrHKOr8g6+uWyq2PfNukqAu7C+HOl8nlLQKr0DtTSeCdHCM8zWeM9m491iXxdRoPq0zCoXfXn3nQE4HKkR35L1nq5ZLYdT7AclWnNQOjDqx7D7gIhRTXGNTlcfPymUuBYMyB2JIP1ZBUs1lQxCnPZj1xatM2ZEddO4JrR883qSFWZYy6PGm5om2UP1SD7qksuwSIm3yNZPUmNZ75JKNkm58kh//xAAoEAACAgEDAwQDAQEBAAAAAAACAwEEAAUSExEhMyIjMTIGJDQUQUP/2gAIAQEAAQUCZlTwNxHkZj2bFnEskmEBJMbi+s1z0lf+7UHM41rPoVW6aC/4z4qfztyv92ZYb6K5wTXBLhIG12whLGMQmimxZ5iXnXpNE5bVE+RFX+duV/mzO1Uz1rVy2NLjsgaOzWGM2bP+iJ7RHaOslNRfFW0lnLpVb+duV8tRuSkt1VPdy3FVfcsy8oSTJtrhSS8m7pi/TFZnLW/HD3aZX/nbiPqUbsq4gtlu4G1mnQJM41Uxc2Ws7TjBiJWs3RpO8av47Ow0fzsxP0Hudedti17VnUA9ysPvz6ZIc24HYkNW2QGFL0yeLWkeBmJ8S/IU7LWoBvCz7iqw/sOGJH7RMZGacrfJYM8esp8DcV4lfa1RHmKoo1sCIqIj3mD1W4dmKcDhjtlGvwrL4uzxkrwtwPCvL6q+5Z1c6iSuuxhfWR3RViVlpwRNRhbRNvfUg3VKZ8lFmD4l/W3s2C5u7czlePSVzuAcv/rWtAu8qbLe5N91o8iNCZyaM3P/ADDxtZxw+yzdZtEJ2x65Vn0Dmqq3Jqs4nE7ce/qQfH42X6Tcn6j4rZQMXF93B1muXJSrTtbGPHflVsbCPaK2T0XPbQ52XG4fxPjvJI4OTLHDG6pO1s+24igMOzvsKXCiIt0QOLnNPLj1duN+GfHyvUYJTFB1YPZ1qO7J64sNxkr9gBzb0wMEuO6zG4353enUH7LXCoYJXTG+tM+NMdMiMEe0xn//xAAaEQACAgMAAAAAAAAAAAAAAAABMAIQICFA/9oACAEDAQE/AbCAaPKGSbHeP//EABoRAQADAAMAAAAAAAAAAAAAAAEQIDACETH/2gAIAQIBAT8BlwSCCjfvB0MCvPwr/8QAMhAAAgECAgcIAQMFAAAAAAAAAQIAAxEQIRIiMUFRcYEEEyAyQlJhkVMjYmNygqGxwf/aAAgBAQAGPwKdTgeWCgbbR109a2UKutiJ3LeYDVjBt0euc0ojV5xmgl73F9mPXBuUMvxgudhsOs7quq9+NhHqgKXJBytP1qKstQb9xiiki0032mXlEJi/coOdpURH9ygwczg8qH4iSoeGtL+Ycd4meVTid8Kd4bqek7NnqurL1wtLdJSTgonZT+y0GDyoPiN8TmpEuNm8cYndgmnxh26TbpSpL51OleC4t6iJeaW+Un4rND8bkRcG5y0qpEHzaNGGmFc+XS2GabEGpCxmYgYDVlkRj0mi+4zt9HgwaLgecEaK3BrwwCaJxBEs40Kg2NxgUSuv5Kd4uHXA84SJTf3KDOk0h6fBoEXDtfpDOxv77rFxM0tO1zLd9EAzCi0EMqNuWBlO3AORrsPoYdmq+yoIuAjQtUOe3bLBL9I4VCoU7DAfnBxxlSlvpm45GUzkeGAEf4znZ39yA4LyjS5TSPKalGw/dP1NGz5ZYA4Cr6WBQ/8AIaZ/qEtDHHETsn7V0fo4LynWEw+nlKb3OqwMDDYYw4YOw2jWHSComQyf+04HCtS/HWYYDlFgvvwUfMW+1dWW44W9wInZ1J1u7Kf5jGawz+MO30/dovivKK67pmlucFszeVE3NFPzM5SAFlBlQH0M4/1LDFP5aRH14M4B6TsMTneXl4vLCqx26Rty8HYqn8mj9+GnfNQMxO8SspVvLhfeIv1CeHg//8QAJxAAAgIBAwQDAQEAAwAAAAAAAAERITFBUWFxgZGhELHwwdEg4fH/2gAIAQEAAT8hw/4NzUbdmy5i9HqN7aY5BxvwScWiSyGV45G+kQuo+J1FK4WXdMVo1qp8/Bg6jUZP5Y6UnhEyOKFJmbQr2PSx8Uku654EgW5vIsrihZ4BiceDJQNGPnkst2kKAcRkapBdhSrHkEfkbmoSzocYuYNKGJFKRQ6P/smpturLs/8ASjNJUSx5isQCZw7j3sidqG6xBQkd40UaHksWXBu1Hvv7+GHWh6DLchb1Cpn6LGiyfRG2ikynGGJuEiSzRFwoCGGThQ+A5gcTbCJb76IA0H6gnGz/AF/6V7n2ahf22JXKiLXWJS191fAHrUkvIEqylp9I1gtNh6UxiiOmbJGnNDxA7bomXTF5X8PufZmfu4EhiVXrJNBhHsRw4kn4zY0uB4Y9dBKrYzoEE6zldeRjnSm9W9TaT1mmfb+x7MnUXXhHfNDrE4P0UggXqHBltYsDLIIpwlLGonG6eia/tykjaqT3TPVf38KL1Y1+yJB4mPA1fwGQqCvoezREdxqLWpCKVazdMXQrYuFlpT8A1BybX+z139/D7v2avQoCfBsR5PSw6JmIiUxNFBJbsJdb0NP7Zi/wdBU2amLJN6wS8CWUPKQP/eEXxoLL5IHfXiJHnKaBpTHRW7JpOo5q5m+hrIxDp/fPsKYvza8iIK9TXcUcgpINWP3F8MdAV62HJEnNQyBJpOBM2ec5FozNyJNykoNwTXWCkCCFLursxjW3SFObstwIWM9ocMxK9MU5pYmGtoRK7WIFOlbgRS17tg8QlGLSePSC+cculB2Vol3B3Pgcal+0/wCGLKrwii+Bfgp0KGnMtWhM2WarCs6xnc6RDa42wGc5c0KgUpHq02y+znx389xLucGaj6CirhEJiSUyzOcILFL0mH3MNqQ2eov+ZNbm4EoOEcBRnA03RIMy1D2NMjCd0U2JQi1Ih2Muip1B5gg7YnIVJnB//9oADAMBAAIAAwAAABAjDiDtIY5Yw4DdLgwxTq5Btg9hJg7+tM35bOPZ83Io7h2S7/ygavVQAcCJ1/x9/wA+/8QAHBEAAwEBAAMBAAAAAAAAAAAAAAEREDEgIUFR/9oACAEDAQE/ENWr0dRYTxkNp8HTSmrVwrhbj1CQuMTpYTeinwQ++LuJEONfm0vsbIT6N0uPFpp4+b//xAAeEQEBAAIDAQADAAAAAAAAAAABABARITFBUSBhcf/aAAgBAgEBPxDyJlpnj+XbxgwTbo/dwZfbpgm7SbZ4l1G9Y3P1LvrGpN8W89IZ8mOvwYCTiW+MGEg1OBkvIaQme4x//8QAJhABAAIBAwQCAgMBAAAAAAAAAQARITFBUWFxobGBkcHwENHh8f/aAAgBAQABPxBZM86eSLVgy8P2fx2mws4WXFAFWKCjf1+6Rlv0rI9R3OsR0KFdSexqdok6RlaKvXxERpthD8BXukGwAMeVglmFS09pweYoG/1j54H09xXhokFPz744Gi0BAumFe0S7VdOxgi9dXS7JfyjCQdGHj5fWE7CgXBwJtxGtQFzZeW2qWRCat7UHIyuqkzSdg7uRE6p2GD/ZdhEaNKCMSqCd0a/dRFbAvYYK7pAqO0geWU5qzxCoULwu/R2lUm7mnZ0xFStwq6KnJXDzrDQp87EWme8dBUuER1oGkKADDhan15gpusfPEzPdFGYkrrBRsZfOIjpZpwi2K/Qa6t/CCur7UWsGbo+5tGB9XN5WP1Bg1qucU9TItUbS3J34dmIR6woK3XQb9x2XZWzJVfX7UIXXXAuVNxcPQgbwBQDS6HfK/UN8U46u0oE1QF62dYaLLOdwLyMv5ofgUMH5L8v4AE3RBW9Lr6gHFCIzpB09qs6H8pWqB1xCmfFtbBreqr5mMMA6uzqDywNatQNBsSktMVaZ+9YIKmq0bH93mUZWsarniClViLZuWvUc/MdRXahE9Jj133TWhp+fxTvI+mAPQx5qJ6QMulUZYgFlVv8AMvgweAyyLRabdJhxyYlqsUlbsqLFAF1RwMPZlwuuZKLV1dY+guJy/kGaL9ZSpTW8+ogs7I/v3LxpSj5YRGxToSp2Ru+pZdUK/DBUKjpxk8xg6gax8jQRH5xDQDgukX0XVQsAK0A04mWKJXNI81F86eUyWfOL5lX72yAfoBTFvKxMDBs/3lQ9pbsSbQha1PF/kxDgBXdIgN0hmqLqI5xAe4V0llEN53iQN4AizobbfjiYreYjlx4KX6YAI0KPtMHWGurbyh+IHuIGKEAPwRd2m7vzLZnMDF2HFkqMAF9tPzKQZV9iCZYPBCIoIvUeV/SZyxpEMAt0TT4gs0gAdVlN0Kk40D96RWnE6SMAtsu/kjpYO7DO2JPo/wBhccNjYcdIkF40Uf0S5djdvFa9kljaEQRGNJRNWCvsYbt1uJo4Ic2zxXMQqXQ0Ltl8s3QM+wTAGAPp/wBgLl0661LAb6UPoAj1YY+56oLXkej8ReU720lPHxD3C9T7Yuj7tt0L8XCyAuOHJM7K0Do/6QljaGT8dOPoqDBWfoRMXUfv+McOi5RioNUUxX2EHAj7YsuzMTsB4IMrZ9iwDgrvNZiBqVsQizTHLTH1kw/Tapko4Py1JVJ1Hj5YWpU0XamXwP1K3WEherDk1tBUOlyzqmcKAfwrzB+qKvwniDnD+6X7UHW3FpkWTA7wbIUSMiNOXrMGUSB2H9k1IYlDi8xcU2qBlQzFhcoAOXGHSUhRQKIL7qAFt4CaEHFk1BlacJ+qD4GOzsgqvH4QZuqLwQPS0o94Bbqg0rh6w0LKSmtL91M2w1QghQBJZhUb/PqUyNfgCVgNiDdB462I9oNKwVgEVMK8oJer90gVG8aupCVibYmBtoQni5Km8sp3ox1mo+7l4o6O0bMtN3vL1JbQ3hbwWqnim68kJ81W+sW65XLLMblwQG2s/9k=",
+      focus:["协议","加固"],
+      duty:"参与协议分析小组，负责抓包记录与文档整理。",
+      projects:["R-04 协议分析","抓包记录模板"] },
+    { name:"龙猫", initial:"猫", role:"核心成员", cat:"defense", since:"2026",
+      avatar:"data:image/jpeg;base64,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",
+      focus:["系统","监控"],
+      duty:"负责监控指标梳理与内部技术纪要的复核。",
+      projects:["R-03 防御加固","纪要复核机制"] }
+  ];
+
+  const SKILLS = [
+    { k:"Web 安全",   v:80 },
+    { k:"系统与权限", v:72 },
+    { k:"协议分析",   v:68 },
+    { k:"防御加固",   v:75 },
+    { k:"应急响应",   v:60 },
+    { k:"逆向基础",   v:55 }
+  ];
+
+  const NOTES = [
+    { date:"2026-09-12", kind:"技术纪要", title:"Web 请求生命周期中的鉴权边界梳理", no:"NOTE-041" },
+    { date:"2026-08-30", kind:"检查清单", title:"本地实验环境加固基线 v1.2", no:"NOTE-040" },
+    { date:"2026-07-18", kind:"技术纪要", title:"TLS 握手过程抓包记录整理", no:"NOTE-038" },
+    { date:"2026-06-05", kind:"流程文档", title:"实验授权登记与材料归档规范", no:"NOTE-035" }
+  ];
+
+  const FAQS = [
+    { q:"参加团队需要什么基础？",
+      a:"不需要精通任何工具。我们更看重两点：是否愿意从原理学起，是否能把做过的事写清楚。零基础也可以从搭建本地环境开始。" },
+    { q:"可以在自己的电脑上练习吗？",
+      a:"可以，但仅限本人拥有权限的设备，或你自己搭建的本地虚拟机。任何涉及他人系统、他人数据的操作都不在团队范围内，也不会由团队提供支持。" },
+    { q:"团队会分享攻击工具吗？",
+      a:"不会。团队研究的是原理、成因与防护思路，产出形式是技术纪要与检查清单，不制作、不传播、不代持任何可被直接用于未授权操作的实现。" },
+    { q:"每周需要投入多少时间？",
+      a:"建议不少于 4 小时。团队按季度排期，每人同时最多承担两个在研议题，避免因时间不足导致议题长期挂起。" },
+    { q:"申请之后是什么流程？",
+      a:"提交后 3 个工作日内收到回复；通过初筛后安排一次 30 分钟的线上沟通，主要聊你的学习方式和想做的方向；确认后进入观察期，第一个议题由负责人带做。" }
+  ];
+
+  /* ==========================================================
+     工具
+     ========================================================== */
+  const $  = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+  const pad2 = n => String(n).padStart(2, "0");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let toastTimer;
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  /* ==========================================================
+     主题
+     ========================================================== */
+  const THEME_KEY = "rule-sec-theme";
+  const themeBtn = $("#themeBtn");
+  const themeLabel = $("#themeLabel");
+  const themeIcon = $("#themeIcon");
+  const themeMeta = document.querySelector('meta[name="theme-color"]:not([media])');
+  const root = document.documentElement;
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
+  const MODES = ["auto", "light", "dark"];
+  const LABEL = { auto:"跟随系统", light:"浅色", dark:"深色" };
+  /* 三种外观各配一枚 1.4px 细线图标，避免文字按钮在信息条里显得单薄 */
+  const ICONS = {
+    auto:'<rect x="2" y="3" width="12" height="8"/><path d="M6 13.5h4M8 11v2.5"/>',
+    light:'<circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M12.6 3.4l-1 1M4.4 11.6l-1 1"/>',
+    dark:'<path d="M13 9.4A5.4 5.4 0 016.6 3a5.6 5.6 0 100 10.8 5.4 5.4 0 006.4-4.4z"/>'
+  };
+
+  function resolve(mode){ return mode === "auto" ? (prefersDark.matches ? "dark" : "light") : mode; }
+
+  function applyTheme(mode){
+    if (MODES.indexOf(mode) < 0) mode = "auto";
+    const resolved = resolve(mode);
+    root.setAttribute("data-theme", resolved);
+    root.setAttribute("data-theme-mode", mode);
+    themeLabel.textContent = LABEL[mode];
+    themeIcon.innerHTML = ICONS[mode];
+    themeBtn.setAttribute("aria-label", "外观：" + LABEL[mode] + "，点击切换");
+    if (themeMeta) themeMeta.setAttribute("content", resolved === "dark" ? "#0C0D0F" : "#F6F6F3");
+  }
+
+  let mode = "auto";
+  try { mode = localStorage.getItem(THEME_KEY) || "auto"; } catch(e){}
+  applyTheme(mode);
+
+  /* 自动模式下跟随系统明暗变化 */
+  const onSchemeChange = () => { if (root.getAttribute("data-theme-mode") === "auto") applyTheme("auto"); };
+  if (typeof prefersDark.addEventListener === "function") prefersDark.addEventListener("change", onSchemeChange);
+  else if (typeof prefersDark.addListener === "function") prefersDark.addListener(onSchemeChange);
+
+  themeBtn.addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme-mode") || "auto";
+    const next = MODES[(MODES.indexOf(cur) + 1) % MODES.length];
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch(e){}
+    toast("外观：" + LABEL[next]);
+  });
+
+  /* ==========================================================
+     时钟 / 版本
+     ========================================================== */
+  function tick(){
+    const d = new Date();
+    const el = $("#clock");
+    if (el) el.textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+  tick(); setInterval(tick, 30000);
+
+  const now = new Date();
+  const ymd = now.getFullYear() + "-" + pad2(now.getMonth()+1) + "-" + pad2(now.getDate());
+  $("#lastUpdate").textContent = ymd;
+  $("#footRev").textContent = "REV " + now.getFullYear() + "-" + pad2(now.getMonth()+1);
+
+  /* ==========================================================
+     研究方向
+     ========================================================== */
+  const state = { cat: "all", kw: "" };
+  const dirList = $("#dirList");
+  const dirResult = $("#dirResult");
+
+  function renderDirections(){
+    const kw = state.kw.trim().toLowerCase();
+    const list = DIRECTIONS.filter(d => {
+      const catOK = state.cat === "all" || d.cat === state.cat;
+      if (!catOK) return false;
+      if (!kw) return true;
+      const hay = (d.id + d.title + d.desc + d.points.join("") + d.tags.join("")).toLowerCase();
+      return hay.indexOf(kw) > -1;
+    });
+
+    dirResult.textContent = "显示 " + pad2(list.length) + " / " + pad2(DIRECTIONS.length) + " 项"
+      + (state.kw ? " · 关键词 “" + state.kw + "”" : "");
+
+    if (!list.length){
+      dirList.innerHTML = '<div class="empty"><b>没有匹配的方向</b>换一个关键词，或把筛选切回“全部”。</div>';
+      return;
+    }
+
+    dirList.innerHTML = list.map(d => {
+      const catName = d.cat === "web" ? "Web" : d.cat === "system" ? "System" : "Defense";
+      return ''
+        + '<article class="spec">'
+        +   '<div class="sid"><b>' + catName + '</b><span>' + d.id + '</span></div>'
+        +   '<div>'
+        +     '<h3>' + d.title + '</h3>'
+        +     '<p>' + d.desc + '</p>'
+        +     '<ul class="points">' + d.points.map(p => '<li>' + p + '</li>').join("") + '</ul>'
+        +     '<div class="tags">' + d.tags.map(t => '<span class="tag">' + t + '</span>').join("") + '</div>'
+        +   '</div>'
+        + '</article>';
+    }).join("");
+  }
+
+  $("#dirChips").addEventListener("click", e => {
+    const btn = e.target.closest(".chip");
+    if (!btn) return;
+    $$("#dirChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === btn)));
+    state.cat = btn.dataset.cat;
+    renderDirections();
+  });
+
+  let kwTimer;
+  const kwInput = $("#kw");
+  const kwClear = $("#kwClear");
+  kwInput.addEventListener("input", () => {
+    kwClear.classList.toggle("show", kwInput.value.length > 0);
+    clearTimeout(kwTimer);
+    kwTimer = setTimeout(() => { state.kw = kwInput.value; renderDirections(); }, 140);
+  });
+  kwClear.addEventListener("click", () => {
+    kwInput.value = ""; state.kw = ""; kwClear.classList.remove("show");
+    renderDirections(); kwInput.focus();
+  });
+
+  /* ==========================================================
+     成员
+     ========================================================== */
+  const memList = $("#memList");
+  let memCat = "all";
+
+  function avatarHTML(m, cls){
+    const img = m.avatar
+      ? '<img src="' + m.avatar + '" alt="" width="80" height="80" loading="lazy" decoding="async"'
+        + ' onerror="this.style.display=\'none\'">'
+      : "";
+    return '<span class="av ' + (cls || "") + '" aria-hidden="true">'
+      + '<span class="fb">' + m.initial + '</span>' + img + '</span>';
+  }
+
+  const memResult = $("#memResult");
+
+  function renderMembers(){
+    const list = MEMBERS.filter(m => memCat === "all" || m.cat === memCat);
+    if (memResult){
+      memResult.textContent = "显示 " + pad2(list.length) + " / " + pad2(MEMBERS.length) + " 人"
+        + (memCat === "all" ? "" : " · " + (memCat === "web" ? "Web 方向" : memCat === "system" ? "系统方向" : "防御方向"));
+    }
+    if (!list.length){
+      memList.innerHTML = '<div class="empty"><b>该分组暂无在册成员</b>把筛选切回“全部”查看完整名单。</div>';
+      return;
+    }
+    memList.innerHTML = list.map((m, i) => ''
+      + '<button class="member" type="button" data-i="' + MEMBERS.indexOf(m) + '" aria-label="查看 ' + m.name + ' 的详情">'
+      +   '<span class="who">' + avatarHTML(m)
+      +     '<span class="txt"><span class="nm">' + m.name + '</span><span class="sub">' + m.role + '</span></span>'
+      +   '</span>'
+      +   '<span class="tags">' + m.focus.map(f => '<span class="tag">' + f + '</span>').join("") + '</span>'
+      +   '<span class="since">' + m.since + '</span>'
+      +   '<span class="go"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 6h7M6 3l3 3-3 3"/></svg></span>'
+      + '</button>'
+    ).join("");
+  }
+
+  $("#memChips").addEventListener("click", e => {
+    const btn = e.target.closest(".chip");
+    if (!btn) return;
+    $$("#memChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === btn)));
+    memCat = btn.dataset.cat;
+    renderMembers();
+  });
+
+  /* 弹层 */
+  const modal = $("#modal");
+  let lastFocused = null;
+
+  function openModal(i){
+    const m = MEMBERS[i];
+    if (!m) return;
+    lastFocused = document.activeElement;
+    $("#modalBody").innerHTML = ''
+      + '<div class="modal-head">' + avatarHTML(m)
+      +   '<div><h3 id="modalName">' + m.name + '</h3><div class="sub">' + m.role + ' · ' + m.since + ' 加入</div></div>'
+      + '</div>'
+      + '<div class="kv">'
+      +   '<div class="k">职责</div><div class="v">' + m.duty + '</div>'
+      +   '<div class="k">关注</div><div class="v modal-tags">' + m.focus.map(f => '<span class="tag">' + f + '</span>').join("") + '</div>'
+      +   '<div class="k">在研</div><div class="v">' + m.projects.map(p => '· ' + p).join("<br>") + '</div>'
+      + '</div>';
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    const closeBtn = modal.querySelector(".modal-close");
+    if (closeBtn) closeBtn.focus();
+  }
+  function closeModal(){
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+  }
+  memList.addEventListener("click", e => {
+    const btn = e.target.closest(".member");
+    if (!btn) return;
+    openModal(Number(btn.dataset.i));
+  });
+  modal.addEventListener("click", e => { if (e.target.closest("[data-close]")) closeModal(); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && modal.classList.contains("open")) closeModal();
+    if (e.key === "Tab" && modal.classList.contains("open")){
+      const f = $$('.modal-card button, .modal-card a, .modal-card input', modal);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+
+  /* ==========================================================
+     能力条
+     ========================================================== */
+  (function buildBars(){
+    const box = $("#skillBars");
+    box.innerHTML = SKILLS.map(s => ''
+      + '<div class="bar">'
+      +   '<div class="top"><span>' + s.k + '</span><b>' + s.v + '%</b></div>'
+      +   '<div class="track"><div class="fill" data-v="' + s.v + '"></div></div>'
+      + '</div>'
+    ).join("") + '<div class="scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
+  })();
+
+  /* ==========================================================
+     纪要
+     ========================================================== */
+  $("#noteList").innerHTML = NOTES.map(n => ''
+    + '<div class="note">'
+    +   '<span class="date mono">' + n.date + '</span>'
+    +   '<span class="kind">' + n.kind + '</span>'
+    +   '<span class="ttl">' + n.title + '</span>'
+    +   '<span class="doc">' + n.no + '</span>'
+    + '</div>'
+  ).join("");
+
+  /* ==========================================================
+     问答
+     ========================================================== */
+  $("#faqList").innerHTML = FAQS.map((f, i) => ''
+    + '<div class="acc-item" data-open="false">'
+    +   '<button class="acc-btn" type="button" aria-expanded="false" aria-controls="fp' + i + '" id="fb' + i + '">'
+    +     '<span>' + f.q + '</span>'
+    +     '<svg class="ico" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 5.5L7 9.5l4-4"/></svg>'
+    +   '</button>'
+    +   '<div class="acc-panel" id="fp' + i + '" role="region" aria-labelledby="fb' + i + '"><div><p>' + f.a + '</p></div></div>'
+    + '</div>'
+  ).join("");
+
+  $("#faqList").addEventListener("click", e => {
+    const btn = e.target.closest(".acc-btn");
+    if (!btn) return;
+    const item = btn.closest(".acc-item");
+    const willOpen = item.dataset.open !== "true";
+    $$("#faqList .acc-item").forEach(it => {
+      it.dataset.open = "false";
+      $(".acc-btn", it).setAttribute("aria-expanded", "false");
+    });
+    if (willOpen){
+      item.dataset.open = "true";
+      btn.setAttribute("aria-expanded", "true");
+    }
+  });
+
+  /* ==========================================================
+     表单
+     ========================================================== */
+  const form = $("#joinForm");
+  const eName = $("#eName"), eMsg = $("#eMsg"), eAgree = $("#eAgree");
+  const fName = $("#fName"), fMsg = $("#fMsg"), fAgree = $("#fAgree");
+  const cName = $("#cName"), cMsg = $("#cMsg");
+
+  function setErr(input, box, msg){
+    if (msg){
+      box.textContent = msg;
+      box.classList.add("show");
+      if (input) input.setAttribute("aria-invalid", "true");
+    } else {
+      box.textContent = "";
+      box.classList.remove("show");
+      if (input) input.removeAttribute("aria-invalid");
+    }
+    return !msg;
+  }
+
+  /* 字数计数：昵称上限 16，自我介绍下限 10、上限 500 */
+  function syncCounts(){
+    if (cName){
+      cName.textContent = fName.value.length + " / 16";
+      cName.classList.toggle("warn", fName.value.length > 16);
+    }
+    if (cMsg){
+      const n = fMsg.value.length;
+      cMsg.textContent = n + " / 500";
+      cMsg.classList.toggle("warn", n > 0 && n < 10);
+    }
+  }
+  fName.addEventListener("input", () => {
+    syncCounts();
+    if (fName.getAttribute("aria-invalid") === "true" && fName.value.trim().length >= 2) setErr(fName, eName, "");
+  });
+  fMsg.addEventListener("input", () => {
+    syncCounts();
+    if (fMsg.getAttribute("aria-invalid") === "true" && fMsg.value.trim().length >= 10) setErr(fMsg, eMsg, "");
+  });
+  fAgree.addEventListener("change", () => {
+    if (fAgree.checked && eAgree.classList.contains("show")) setErr(fAgree, eAgree, "");
+  });
+  syncCounts();
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = fName.value.trim();
+    const msg  = fMsg.value.trim();
+    const agree = fAgree.checked;
+
+    let ok = true;
+    ok = setErr(fName, eName, name.length < 2 ? "请填写 2–16 个字符的昵称" : "") && ok;
+    ok = setErr(fMsg, eMsg, msg.length < 10 ? "自我介绍不少于 10 个字，方便我们了解你" : "") && ok;
+    ok = setErr(fAgree, eAgree, agree ? "" : "请先确认已阅读《合规准则》") && ok;
+
+    if (!ok){
+      const first = form.querySelector('[aria-invalid="true"]');
+      if (first) first.focus();
+      return;
+    }
+
+    const dirSel = $("#fDir");
+    const dirText = dirSel.options[dirSel.selectedIndex].text;
+    /* 受理编号：REQ-YYYYMMDD-XXXX，后缀取 4 位大写字母数字，不足位补 0 */
+    const CH = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    let suffix = "";
+    if (window.crypto && window.crypto.getRandomValues){
+      const buf = new Uint8Array(4);
+      window.crypto.getRandomValues(buf);
+      for (let k = 0; k < 4; k++) suffix += CH[buf[k] % CH.length];
+    } else {
+      suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+      while (suffix.length < 4) suffix += "0";
+    }
+    const req = "REQ-" + now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate())
+              + "-" + suffix;
+
+    $("#formSlot").innerHTML = ''
+      + '<div class="success" role="status">'
+      +   '<div class="k">Submitted / 已受理</div>'
+      +   '<h3>' + escapeHTML(name) + '，申请已提交</h3>'
+      +   '<p>这是本地演示，数据未上传服务器。真实流程中，团队会在 3 个工作日内通过邮件回复初筛结果。</p>'
+      +   '<div class="receipt">'
+      +     '<div class="wide"><span>受理编号</span><b id="reqNo">' + req + '</b>'
+      +       '<button class="copy-btn" type="button" id="copyReq" aria-label="复制受理编号">复制</button></div>'
+      +     '<div><span>提交时间</span><b>' + ymd + " " + pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + '</b></div>'
+      +     '<div><span>意向方向</span><b>' + escapeHTML(dirText) + '</b></div>'
+      +     '<div><span>预计回复</span><b>3 个工作日内</b></div>'
+      +   '</div>'
+      +   '<button class="btn btn--ghost btn--sm" type="button" id="againBtn">再提交一份</button>'
+      + '</div>';
+
+    const successBox = $("#formSlot .success");
+    if (successBox){
+      successBox.setAttribute("tabindex", "-1");
+      successBox.focus();
+    }
+    const copyBtn = $("#copyReq");
+    if (copyBtn){
+      copyBtn.addEventListener("click", () => {
+        const done = () => { copyBtn.textContent = "已复制"; toast("受理编号已复制"); };
+        if (navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(req).then(done).catch(() => fallbackCopy(req, done));
+        } else {
+          fallbackCopy(req, done);
+        }
+      });
+    }
+
+    $("#againBtn").addEventListener("click", () => location.reload());
+    toast("申请已提交，受理编号 " + req);
+    const meta = $("#formMeta");
+    if (meta) meta.textContent = "已提交 · " + req;
+  });
+
+  function escapeHTML(s){
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  }
+
+  /* 剪贴板不可用（非安全上下文 / 权限被拒）时的兜底复制 */
+  function fallbackCopy(text, done){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) done();
+    else toast("复制失败，请手动选中编号");
+  }
+
+  /* ==========================================================
+     入场动画 / 计数 / 技能条
+     ========================================================== */
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (!en.isIntersecting) return;
+      en.target.classList.add("in");
+      io.unobserve(en.target);
+    });
+  }, { threshold: 0.1, rootMargin: "0px 0px -8% 0px" });
+  $$(".rv").forEach(el => io.observe(el));
+
+  function countUp(el, target){
+    if (reduceMotion){ el.textContent = pad2(target); return; }
+    const dur = 900, t0 = performance.now();
+    function step(t){
+      const p = Math.min(1, (t - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = pad2(Math.round(target * eased));
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = pad2(target);
+    }
+    requestAnimationFrame(step);
+  }
+
+  const counters = [
+    { el: $("#mMembers"),  v: MEMBERS.length },
+    { el: $("#mResearch"), v: DIRECTIONS.length },
+    { el: $("#mNotes"),    v: NOTES.length },
+    { el: $("#mRules"),    v: 5 }
+  ];
+  let counted = false;
+  function runCounters(){
+    if (counted) return;
+    counted = true;
+    counters.forEach(c => { if (c.el) countUp(c.el, c.v); });
+  }
+  const metricsEl = $("#metrics");
+  /* 触发条件用「顶部进入视口下缘」而非固定比例阈值：
+     视口很高或缩放很小时，纯比例阈值会永远不满足，指标会停在 0。 */
+  function metricsVisible(){
+    if (!metricsEl) return false;
+    const r = metricsEl.getBoundingClientRect();
+    return r.top < window.innerHeight * 0.92 && r.bottom > 0;
+  }
+  const cio = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting){ runCounters(); cio.unobserve(en.target); } });
+  }, { threshold: 0 });
+  if (metricsEl) cio.observe(metricsEl);
+  function checkCounters(){
+    if (counted || !metricsVisible()) return;
+    runCounters();
+  }
+  /* 轮询兜底：滚动事件在部分环境（无头截图、程序化滚动）不触发，
+     用短周期几何检查保证指标一定跑起来，触发后立刻自停。 */
+  let cPoll = 0;
+  const cTimer = setInterval(() => {
+    if (counted || ++cPoll > 24){ clearInterval(cTimer); return; }
+    checkCounters();
+  }, 260);
+  window.addEventListener("scroll", checkCounters, { passive: true });
+  window.addEventListener("resize", checkCounters, { passive: true });
+  checkCounters();
+
+  let barsDone = false;
+  function runBars(root){
+    if (barsDone) return;
+    barsDone = true;
+    (root || document).querySelectorAll(".fill").forEach(f => { f.style.width = f.dataset.v + "%"; });
+  }
+  const barsEl = $("#skillBars");
+  function barsVisible(){
+    if (!barsEl) return false;
+    const r = barsEl.getBoundingClientRect();
+    return r.top < window.innerHeight * 0.94 && r.bottom > 0;
+  }
+  const bio = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting){ runBars(en.target); bio.unobserve(en.target); } });
+  }, { threshold: 0 });
+  if (barsEl) bio.observe(barsEl);
+  function checkBars(){
+    if (barsDone || !barsVisible()) return;
+    runBars(barsEl);
+  }
+  let bPoll = 0;
+  const bTimer = setInterval(() => {
+    if (barsDone || ++bPoll > 24){ clearInterval(bTimer); return; }
+    checkBars();
+  }, 260);
+  window.addEventListener("scroll", checkBars, { passive: true });
+  window.addEventListener("resize", checkBars, { passive: true });
+  checkBars();
+
+  /* ==========================================================
+     导航：滚动状态 / 高亮 / 移动端
+     ========================================================== */
+  const head = $("#siteHead");
+  const navLinks = $$("#nav a");
+  const navIds = navLinks.map(a => a.getAttribute("href").slice(1));
+  const sections = navIds.map(id => document.getElementById(id)).filter(Boolean);
+
+  function setActive(id){
+    navLinks.forEach(a => {
+      if (a.getAttribute("href") === "#" + id) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) setActive(en.target.id); });
+  }, { rootMargin: "-72px 0px -68% 0px", threshold: 0 });
+  sections.forEach(s => spy.observe(s));
+
+  const burger = $("#burger");
+  const nav = $("#nav");
+  function closeNav(){ nav.classList.remove("open"); burger.setAttribute("aria-expanded", "false"); }
+  burger.addEventListener("click", () => {
+    const open = nav.classList.toggle("open");
+    burger.setAttribute("aria-expanded", String(open));
+    burger.setAttribute("aria-label", open ? "关闭菜单" : "打开菜单");
+  });
+  nav.addEventListener("click", e => { if (e.target.tagName === "A") closeNav(); });
+  document.addEventListener("click", e => {
+    if (!nav.classList.contains("open")) return;
+    if (!e.target.closest("#nav") && !e.target.closest("#burger")) closeNav();
+  });
+
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const y = window.scrollY;
+      head.classList.toggle("stuck", y > 8);
+      $("#toTop").classList.toggle("show", y > 520);
+      ticking = false;
+    });
+  }, { passive: true });
+
+  $("#toTop").addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  });
+
+  /* 平滑滚动（带 header 偏移补偿由 CSS scroll-margin 处理） */
+  document.addEventListener("click", e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = a.getAttribute("href").slice(1);
+    const target = document.getElementById(id);
+    if (!target) return;
+    e.preventDefault();
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    history.replaceState(null, "", "#" + id);
+  });
+
+  /* ==========================================================
+     首屏渲染
+     ========================================================== */
+  $("#dirTotal").textContent = pad2(DIRECTIONS.length);
+  $("#memTotal").textContent = pad2(MEMBERS.length);
+  renderDirections();
+  renderMembers();
+})();
+</script>
+</body>
+</html>
