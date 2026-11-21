@@ -215,6 +215,16 @@ select.i,.bar-sel{
 .stats span{display:inline-flex;align-items:baseline;gap:6px;font-size:11.5px;letter-spacing:.06em;color:var(--muted)}
 .stats b{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:0;color:var(--ink)}
 
+/* 公告管理 */
+.nlist{display:grid;gap:8px;margin-top:16px}
+.nrow{border:1px solid var(--line);border-radius:4px;background:var(--surface-2);padding:11px 13px}
+.nrow-b{font-size:13px;line-height:1.65;color:var(--ink);word-break:break-word}
+.nrow-a{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.nrow-t{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted)}
+.nrow-a .btn{min-height:28px;padding:0 10px;font-size:12px}
+.btn.danger{border-color:color-mix(in srgb,var(--danger) 42%,transparent);color:var(--danger)}
+.btn.danger:hover{background:color-mix(in srgb,var(--danger) 12%,transparent)}
+
 /* 徽章 */
 .badge{
   position:relative;display:inline-flex;align-items:center;gap:5px;
@@ -368,6 +378,7 @@ select.i,.bar-sel{
         <option value="name">按名称</option>
       </select>
       <span class="spacer"></span>
+      <button class="btn" type="button" id="noticeBtn">公告</button>
       <button class="btn" type="button" id="newBtn">新建成员</button>
       <button class="btn" type="button" id="refreshBtn">刷新</button>
       <button class="btn" type="button" id="logoutBtn">重置会话</button>
@@ -885,7 +896,7 @@ select.i,.bar-sel{
     ];
     openSheet(
       '<h2 id="sheetT">认证标志</h2>'
-      + '<p class="cap">' + esc(m.name || "") + " · 标志按顺序排列在成员名单与个人主页，带渐变与呼吸效果。</p>"
+      + '<p class="cap">' + esc(m.name || "") + " · 标志按顺序排列在成员名单与个人主页，按创始人、认证、核心成员、技术专家的优先级排序。</p>"
       + kinds.map(function(k){
           var cls = k[0] === "founder" ? "k-founder" : k[0] === "verified" ? "k-verified" : k[0] === "elite" ? "k-elite" : "k-staff";
           return '<div class="brow"><span class="badge ' + cls + '"><i></i>' + k[1] + "</span>"
@@ -959,6 +970,71 @@ select.i,.bar-sel{
   }
 
   /* ---------- 新建成员 ---------- */
+  function fmtAt(iso){
+    if (!iso) return "";
+    var dt = new Date(iso);
+    if (isNaN(dt.getTime())) return "";
+    var p2 = function(n){ return n < 10 ? "0" + n : String(n); };
+    return dt.getFullYear() + "/" + (dt.getMonth() + 1) + "/" + dt.getDate()
+      + " " + p2(dt.getHours()) + ":" + p2(dt.getMinutes());
+  }
+
+  function paintNotices(){
+    var box = $("#nList");
+    if (!box) return;
+    rpc("rsx_notice_list", {}).then(function(list){
+      if (!list || !list.length){
+        box.innerHTML = '<div class="empty"><b>还没有公告</b>发布一条后会出现在站点顶部。</div>';
+        return;
+      }
+      box.innerHTML = list.map(function(n){
+        return '<div class="nrow"><div class="nrow-b">' + esc(n.body) + "</div>"
+          + '<div class="nrow-a"><span class="nrow-t">' + esc(fmtAt(n.at)) + "</span>"
+          + '<button class="btn danger" type="button" data-del="' + esc(n.id) + '">删除</button></div></div>';
+      }).join("");
+      Array.prototype.forEach.call(box.querySelectorAll("[data-del]"), function(btn){
+        btn.addEventListener("click", function(){
+          btn.disabled = true;
+          rpc("rsx_admin_notice", { p_token: token, p_id: btn.getAttribute("data-del"), p_action: "delete" })
+            .then(function(){ paintNotices(); loadStats(); })
+            .catch(function(err){ btn.disabled = false; toast(err.message || "删除失败"); });
+        });
+      });
+    }).catch(function(err){
+      box.innerHTML = '<div class="empty"><b>公告读取失败</b>' + esc(err.message || "") + "</div>";
+    });
+  }
+
+  function sheetNotice(){
+    openSheet(
+      '<h2 id="sheetT">公告</h2>'
+      + '<p class="cap">发布后立刻出现在站点顶部，访客向下滚动时自动收起。单条不超过 160 字，按发布时间倒序展示最近 8 条。</p>'
+      + '<div class="f"><label class="l" for="nw">公告内容</label>'
+      + '<textarea class="i ta" id="nw" maxlength="160" placeholder="例如：本周六 20:00 进行日志分析专题复盘，材料已同步到内部纪要。"></textarea></div>'
+      + '<div class="err" id="nE"></div>'
+      + '<div class="actions"><button class="btn primary" type="button" id="nAdd">发布</button></div>'
+      + '<div class="nlist" id="nList"><div class="skel" style="height:52px"></div></div>'
+    );
+    paintNotices();
+    $("#nAdd").addEventListener("click", function(){
+      var v = $("#nw").value.trim();
+      var err = $("#nE");
+      err.textContent = "";
+      if (!v){ err.textContent = "请填写公告内容"; return; }
+      var btn = $("#nAdd");
+      btn.disabled = true;
+      rpc("rsx_admin_notice", { p_token: token, p_body: v, p_action: "add" }).then(function(){
+        $("#nw").value = "";
+        btn.disabled = false;
+        paintNotices();
+        loadStats();
+      }).catch(function(e2){
+        btn.disabled = false;
+        err.textContent = e2.message || "发布失败";
+      });
+    });
+  }
+
   function sheetNew(){
     openSheet(
       '<h2 id="sheetT">新建成员</h2>'
@@ -1002,6 +1078,7 @@ select.i,.bar-sel{
   /* ---------- 事件绑定 ---------- */
   var timer = null;
   $("#retryBtn").addEventListener("click", open);
+  $("#noticeBtn").addEventListener("click", sheetNotice);
   $("#newBtn").addEventListener("click", sheetNew);
   $("#refreshBtn").addEventListener("click", load);
   $("#logoutBtn").addEventListener("click", logout);
