@@ -102,6 +102,36 @@ input,select,button,textarea{font:inherit;color:inherit}
   background:color-mix(in srgb,var(--danger) 8%,transparent);
 }
 .err.on{display:block}
+.diag{margin-top:16px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.diag-row{
+  display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:baseline;
+  padding:9px 12px;font-size:12px;line-height:1.6;border-top:1px solid var(--line);
+}
+.diag-row:first-child{border-top:0}
+.diag-row .k{color:var(--muted)}
+.diag-row .v{color:var(--ink-2);word-break:break-all}
+.diag-row .v b{font-weight:500}
+.diag-row.bad .v{color:var(--danger)}
+.diag-row.ok .v{color:var(--accent)}
+.adv{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.adv>summary{
+  cursor:pointer;list-style:none;font-size:12.5px;color:var(--muted);
+  padding:6px 0;transition:color .16s;
+}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary::before{
+  content:"";display:inline-block;width:6px;height:6px;margin-right:8px;
+  border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(45deg) translateY(-1px);transition:transform .2s;
+}
+.adv[open]>summary::before{transform:rotate(225deg) translateY(-2px)}
+.adv>summary:hover,.adv>summary:focus-visible{color:var(--ink-2)}
+.adv>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.adv-tip{margin:10px 0 14px;font-size:12px;line-height:1.75;color:var(--muted)}
+.adv-tip code{
+  font-family:var(--mono);font-size:11.5px;padding:1px 5px;border-radius:3px;
+  background:var(--surface-2);color:var(--ink-2);
+}
 
 /* 主体 */
 .main{padding:32px 0 64px}
@@ -305,6 +335,20 @@ select.i,.bar-sel{
     <p class="sub" id="gateMsg">正在连接数据服务。</p>
     <div class="err" id="gateErr"></div>
     <button class="btn btn--wide" type="button" id="retryBtn" hidden>重新连接</button>
+    <div class="diag" id="diag" hidden></div>
+
+    <details class="adv" id="adv">
+      <summary>连不上？手动指定数据服务地址</summary>
+      <p class="adv-tip">托管平台若注入 <code>Content-Security-Policy: connect-src 'self'</code>，浏览器会在发请求前拦掉跨域访问。填一个同源反向代理前缀（例如 <code>api/rpc/</code>）即可绕过，设置会保存在本机。</p>
+      <div class="f">
+        <label class="l" for="apiIn">接口前缀</label>
+        <input class="i" id="apiIn" type="text" spellcheck="false" placeholder="api/rpc/ 或 https://你的代理/rpc/">
+      </div>
+      <div class="actions">
+        <button class="btn btn--sm" type="button" id="apiReset">恢复默认</button>
+        <button class="btn btn--sm btn--primary" type="button" id="apiSave">保存并重连</button>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -353,8 +397,78 @@ select.i,.bar-sel{
   "use strict";
 
   /* 数据服务：与前台同一套 RPC，表对匿名不可见，只能经 SECURITY DEFINER 函数读写 */
-  var API = "https://tmlwftreycbvscquhrap.supabase.co/rest/v1/rpc/";
   var KEY = "sb_publishable_8pNlC0oS8caEGhxBcImTqQ__p1go_xG";
+  var DIRECT = "https://tmlwftreycbvscquhrap.supabase.co/rest/v1/rpc/";
+  /* 数据服务地址做成有序候选。托管平台常注入 CSP（connect-src 'self'），
+     浏览器会在 fetch 之前就拒掉跨域请求，页面只会显示「连不上」。
+     依次尝试：自定义（?api= 或 window.RSX_API）→ 直连 → 同源代理。 */
+  var API_KEY = "rsx.api.base";
+  function readBase(){
+    var q = "";
+    try { q = new URLSearchParams(location.search).get("api") || ""; } catch (e) {}
+    if (q) return q;
+    try { var v = localStorage.getItem(API_KEY); if (v) return v; } catch (e) {}
+    return typeof window.RSX_API === "string" ? window.RSX_API : "";
+  }
+  function buildList(){
+    var custom = readBase();
+    var out = [];
+    if (custom) out.push(/\/$/.test(custom) ? custom : custom + "/");
+    out.push(DIRECT);
+    out.push("api/rpc/");
+    out.push("./api/rpc/");
+    return out;
+  }
+  var API_LIST = buildList();
+  var apiIdx = 0;
+  var cspHit = "";
+  document.addEventListener("securitypolicyviolation", function(e){
+    var d = e.violatedDirective || "";
+    if (!cspHit && /connect-src|default-src/.test(d)) cspHit = e.blockedURI || d;
+  });
+  function diagnose(){
+    if (cspHit) return "当前页面的安全策略（CSP）禁止访问数据服务，浏览器在发请求前就拦下了。这不是站点故障：换一个不注入 CSP 的托管方式，或用同源代理地址（?api=api/rpc/）。";
+    if (navigator.onLine === false) return "设备当前处于离线状态，连上网络后会自动恢复。";
+    var o = location.origin;
+    if (/^(blob|data):/.test(location.protocol) || !o || o === "null")
+      return "页面被放在隔离沙箱里运行，无法访问任何外部服务。请用平台的「直接打开 / 新窗口打开」入口。";
+    return "网络连不上数据服务，请检查网络或代理后重试";
+  }
+
+  /* 手动指定接口前缀：托管平台注入的 CSP 无法在前端绕过，只能换成同源代理。
+     这里让使用者自己填一次，存本机，下次打开直接生效。 */
+  function setApiBase(v){
+    v = (v || "").trim();
+    try { if (v) localStorage.setItem(API_KEY, v); else localStorage.removeItem(API_KEY); } catch (e) {}
+    API_LIST = buildList();
+    apiIdx = 0;
+    cspHit = "";
+  }
+
+  function advWire(){
+    var box = $("#adv");
+    if (!box) return;
+    var inp = $("#apiIn");
+    var saved = "";
+    try { saved = localStorage.getItem(API_KEY) || ""; } catch (e) {}
+    if (saved) { inp.value = saved; box.open = true; }
+    $("#apiSave").addEventListener("click", function(){
+      var v = inp.value.trim();
+      if (!v){ toast("请填写接口前缀"); return; }
+      setApiBase(v);
+      $("#main").hidden = true;
+      $("#gate").hidden = false;
+      open();
+    });
+    $("#apiReset").addEventListener("click", function(){
+      inp.value = "";
+      setApiBase("");
+      $("#main").hidden = true;
+      $("#gate").hidden = false;
+      open();
+    });
+  }
+
   /* 控制台口令：由数据库 rsx_console 保存，页面用它换一次管理员会话，不再要求人工输入密码 */
   var PASS = "a932313e3ce3d98fcb95a69ab9b756e988c15c0106a80814";
   var TK = "rsx.admin.token";
@@ -432,7 +546,7 @@ select.i,.bar-sel{
   function once(fn, body){
     var ctl = new AbortController();
     var abort = setTimeout(function(){ ctl.abort(); }, TIMEOUT);
-    return fetch(API + fn, {
+    return fetch(API_LIST[apiIdx] + fn, {
       method: "POST",
       signal: ctl.signal,
       headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" },
@@ -458,11 +572,33 @@ select.i,.bar-sel{
     });
   }
 
+  /* 候选顺序按运行环境动态决定：一旦捕获到 CSP 违规，说明浏览器会拦掉一切
+     跨域请求，直接把直连排到最后，先试同源代理，避免每个请求都白撞一次。 */
+  function candidates(){
+    if (!cspHit) return API_LIST.slice();
+    var direct = API_LIST.filter(function(u){ return u === DIRECT; });
+    var rest = API_LIST.filter(function(u){ return u !== DIRECT; });
+    return rest.concat(direct);
+  }
+
   function rpc(fn, body){
-    return once(fn, body).catch(function(e){
-      if (!e.network) throw e;
-      return new Promise(function(r){ setTimeout(r, 600); }).then(function(){ return once(fn, body); });
-    });
+    var list = candidates();
+    var i = 0;
+    apiIdx = 0;
+    function go(){
+      return once(fn, body).catch(function(e){
+        var deadProxy = e.status === 404 || e.status === 405 || e.status === 501;
+        if (!e.network && !deadProxy) throw e;
+        if (i < list.length - 1){
+          i++; apiIdx = i;
+          return new Promise(function(r){ setTimeout(r, 260); }).then(go);
+        }
+        var err = new Error(diagnose());
+        err.network = true;
+        throw err;
+      });
+    }
+    return go();
   }
 
   /* ---------- 连接数据服务（无人工登录） ---------- */
@@ -477,7 +613,57 @@ select.i,.bar-sel{
       var e = $("#gateErr");
       e.textContent = msg;
       e.classList.add("on");
+      renderDiag();
+      /* 诊断出 CSP / 沙箱 / 自定义地址问题时，直接把手动设置区展开，
+         否则使用者只会看到一个「重新连接」按钮反复失败。 */
+      if (/CSP|安全策略|沙箱|接口前缀/.test(msg)){
+        var box = $("#adv");
+        if (box) box.open = true;
+      }
     }
+  }
+
+  /* 环境自检：把「连不上」拆成四层可判定的结论，避免使用者无从下手 */
+  function renderDiag(){
+    var box = $("#diag");
+    if (!box) return;
+    var rows = [];
+    var proto = location.protocol.replace(":", "");
+    var origin = location.origin || "null";
+    var weird = /^(blob|data|file)$/.test(proto) || !location.origin || origin === "null";
+    rows.push({
+      k: "页面来源",
+      v: weird
+        ? "<b>隔离环境</b>（" + proto + "），无法访问外部服务。请用平台的「直接打开 / 新窗口」入口"
+        : "<b>正常</b>（" + proto + " · " + origin + "）",
+      bad: weird
+    });
+    rows.push({
+      k: "安全策略",
+      v: cspHit
+        ? "<b>被拦截</b>：connect-src 不允许访问数据服务域名（" + cspHit + "）"
+        : "<b>未拦截</b>跨域请求",
+      bad: !!cspHit
+    });
+    var lsOk = false;
+    try { localStorage.setItem("rsx.probe", "1"); localStorage.removeItem("rsx.probe"); lsOk = true; } catch (e) {}
+    rows.push({
+      k: "本地存储",
+      v: lsOk ? "<b>可用</b>，会话可在本机保持" : "<b>不可用</b>（平台禁用存储），会话只在本次打开有效",
+      bad: !lsOk
+    });
+    rows.push({
+      k: "数据服务",
+      v: cspHit
+        ? "当前地址无法访问，需要平台放行或改用同源代理前缀"
+        : "当前地址访问失败，请检查网络或改用同源代理前缀",
+      bad: true
+    });
+    box.innerHTML = rows.map(function(r){
+      return '<div class="diag-row ' + (r.bad ? "bad" : "ok") + '">'
+        + '<span class="k">' + r.k + '</span><span class="v">' + r.v + '</span></div>';
+    }).join("");
+    box.hidden = false;
   }
 
   function open(){
@@ -827,6 +1013,8 @@ select.i,.bar-sel{
   });
 
   /* ---------- 启动：口令换会话，无需人工登录 ---------- */
+  advWire();
+
   (function boot(){
     var cached = null;
     try { cached = localStorage.getItem(TK); } catch (e) { cached = null; }
