@@ -378,6 +378,7 @@ select.i,.bar-sel{
         <option value="name">按名称</option>
       </select>
       <span class="spacer"></span>
+      <button class="btn" type="button" id="exportBtn">导出名单</button>
       <button class="btn" type="button" id="noticeBtn">公告</button>
       <button class="btn" type="button" id="newBtn">新建成员</button>
       <button class="btn" type="button" id="refreshBtn">刷新</button>
@@ -970,6 +971,38 @@ select.i,.bar-sel{
   }
 
   /* ---------- 新建成员 ---------- */
+  function csvCell(v){
+    var t = (v === null || v === undefined) ? "" : String(v);
+    return '"' + t.replace(/"/g, '""') + '"';
+  }
+
+  function exportCsv(){
+    if (!rows.length){ toast("当前没有可导出的成员"); return; }
+    var head = ["显示名称", "职责", "职务", "领域", "排序权重", "认证标志",
+                "关注方向", "在研项目", "意向方向", "TT", "QQ", "邮箱", "加入时间", "封禁至"];
+    var lines = [head.map(csvCell).join(",")];
+    rows.forEach(function(m){
+      lines.push([
+        m.name, m.duty, m.role, m.field, m.weight,
+        (m.badges || []).map(function(x){ return x.label; }).join(" / "),
+        (m.focus || []).join(" / "), (m.projects || []).join(" / "), m.appliedDir,
+        m.contact && m.contact.tt, m.contact && m.contact.qq, m.contact && m.contact.mail,
+        m.since, m.bannedUntil || ""
+      ].map(csvCell).join(","));
+    });
+    /* BOM 让 Excel 正确识别 UTF-8 中文 */
+    var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a2 = document.createElement("a");
+    a2.href = url;
+    a2.download = "rule-sec-members-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a2);
+    a2.click();
+    document.body.removeChild(a2);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    toast("已导出 " + rows.length + " 位成员");
+  }
+
   function fmtAt(iso){
     if (!iso) return "";
     var dt = new Date(iso);
@@ -1078,6 +1111,7 @@ select.i,.bar-sel{
   /* ---------- 事件绑定 ---------- */
   var timer = null;
   $("#retryBtn").addEventListener("click", open);
+  $("#exportBtn").addEventListener("click", exportCsv);
   $("#noticeBtn").addEventListener("click", sheetNotice);
   $("#newBtn").addEventListener("click", sheetNew);
   $("#refreshBtn").addEventListener("click", load);
